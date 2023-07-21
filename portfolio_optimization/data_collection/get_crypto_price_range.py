@@ -1,51 +1,68 @@
-from datetime import datetime, timezone, timedelta
-import requests
 import pandas as pd
-import json
+import numpy as np
+import glob
+import os
 
 
-def get_crypto_price_range(id, start_date, end_date):
-    # Convert dates to UNIX timestamps
-    start_date_timestamp = datetime.timestamp(start_date)
-    end_date_timestamp = datetime.timestamp(end_date)
+def get_historical_prices_for_assets(
+    assets_list=None,
+    folder_path="data/csv",
+    interested_columns=["ReferenceRate"],
+):
+    """
+    Returns a pandas DataFrame containing historical prices for a list of assets.
 
-    url = f"https://api.coingecko.com/api/v3/coins/{id}/market_chart/range"
-    parameters = {
-        "vs_currency": "usd",
-        "from": start_date_timestamp,
-        "to": end_date_timestamp,
-    }
+    Parameters:
+    assets_list (list): A list of asset names to retrieve prices for. If None, all assets in the specified folder_path will be used.
+    folder_path (str): The path to the folder containing the CSV files with the historical prices.
+    interested_columns (list): A list of column names to retrieve from the CSV files.
 
-    response = requests.get(url, params=parameters)
+    Returns:
+    pandas.DataFrame: A DataFrame containing the historical prices for the specified assets.
+    """
+    df_dict = {}
 
-    if response.status_code == 200:
-        return json.loads(response.text)
+    if assets_list is None:
+        csv_files = glob.glob(folder_path + "/*.csv")
     else:
-        return None
+        csv_files = [folder_path + "/" + asset + ".csv" for asset in assets_list]
 
+    for file in csv_files:
+        asset_name = os.path.basename(file).split(".")[
+            0
+        ]  # Extract asset name from file name
 
-def get_historical_prices_for_assets(asset_list, start_date, end_date):
-    # Initialize an empty dict of dataframes
-    df_dict = dict()
+        try:
+            df = pd.read_csv(file, usecols=["time"] + interested_columns)
+            # Rename columns to include asset name for clarity
+            rename_dict = {col: f"{asset_name}" for col in interested_columns}
+            df.rename(columns=rename_dict, inplace=True)
 
-    for asset in asset_list:
-        # Get historical price of asset
-        data = get_crypto_price_range(asset, start_date, end_date)
-        if data is not None:
-            prices = data["prices"]
-            # Convert data to DataFrame
-            df = pd.DataFrame(prices, columns=["time", asset])
-            # Convert timestamp to datetime
-            df["time"] = pd.to_datetime(df["time"], unit="ms")
-            # Set time as index
-            df.set_index("time", inplace=True)
-            # Resampling the time series data to 1H intervals
-            df = df.resample("1H").mean()
-            df_dict[asset] = df
-        else:
-            print(f"Failed to fetch data for {asset}")
+        except ValueError as e:
+            # Missing column in csv, create df with zero
+            if "Usecols do not match columns" in str(e):
+                df = pd.read_csv(file, usecols=["time"])
 
-    # Concatenate all dataframes
-    df_all = pd.concat(df_dict.values(), axis=1)
+                # Add missing columns to dataframe with zero as values
+                for col in interested_columns:
+                    df[f"{asset_name}"] = 0
+
+        # Rename 'time' column to 'date'
+        df["time"] = pd.to_datetime(df["time"])
+        df.rename(columns={"time": "date"}, inplace=True)
+        df.set_index("date", inplace=True)  # Set date as index
+        df_dict[asset_name] = df
+
+    # Join all dataframes on 'time' index
+    df_all = pd.concat(df_dict.values(), axis=1, join="inner")
+
+    # Remove rows containing NaN values
+    df_all = df_all.dropna()
+
+    # Replace infinite values with NaN
+    df_all.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+    # Remove rows containing infinite values (NaN values after previous replacement)
+    df_all = df_all.dropna()
 
     return df_all
