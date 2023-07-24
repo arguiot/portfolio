@@ -25,7 +25,11 @@ def get_historical_prices_for_assets(
     if assets_list is None:
         csv_files = glob.glob(folder_path + "/*.csv")
     else:
-        csv_files = [folder_path + "/" + asset + ".csv" for asset in assets_list]
+        csv_files = [
+            folder_path + "/" + asset + ".csv"
+            for asset in assets_list
+            if os.path.exists(folder_path + "/" + asset + ".csv")
+        ]
 
     for file in csv_files:
         asset_name = os.path.basename(file).split(".")[
