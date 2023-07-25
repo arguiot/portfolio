@@ -17,7 +17,7 @@ class Markowitz(GeneralOptimization):
         SAMPLE_COV = 1
         LEDOIT_WOLF = 2
 
-    def __init__(self, df, cov=None):
+    def __init__(self, df, cov=None, weight_bounds=(0, 1)):
         """
         Initialize the Markowitz class.
 
@@ -28,6 +28,7 @@ class Markowitz(GeneralOptimization):
         """
         super().__init__(df)
 
+        self.weight_bounds = weight_bounds
         self.mode = self.Mode.LEDOIT_WOLF
 
         if cov is None:
@@ -46,7 +47,10 @@ class Markowitz(GeneralOptimization):
         None
         """
         ef = EfficientFrontier(
-            self.rets, self.cov_matrix, weight_bounds=(None, None), solver="ECOS_BB"
+            self.rets,
+            self.cov_matrix,
+            weight_bounds=self.weight_bounds,
+            solver="ECOS_BB",
         )
         return ef
 
@@ -90,7 +94,10 @@ class Markowitz(GeneralOptimization):
         """
         fig, ax = plt.subplots()
         ef = EfficientFrontier(
-            self.rets, self.cov_matrix, weight_bounds=(None, None), solver="ECOS_BB"
+            self.rets,
+            self.cov_matrix,
+            weight_bounds=self.weight_bounds,
+            solver="ECOS_BB",
         )
         ef_max_sharpe = ef.deepcopy()
         plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False)
@@ -103,7 +110,7 @@ class Markowitz(GeneralOptimization):
         )
 
         # Generate random portfolios
-        n_samples = 10000
+        n_samples = 15000
         w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
         rets = w.dot(ef.expected_returns)
         stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))

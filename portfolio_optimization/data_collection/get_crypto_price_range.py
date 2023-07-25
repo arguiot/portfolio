@@ -2,20 +2,21 @@ import pandas as pd
 import numpy as np
 import glob
 import os
+import datetime
 
 
 def get_historical_prices_for_assets(
     assets_list=None,
     folder_path="data/csv",
     interested_columns=["ReferenceRate"],
+    time_range=datetime.timedelta(days=90),
 ):
     """
-    Returns a pandas DataFrame containing historical prices for a list of assets.
+    ...
 
     Parameters:
-    assets_list (list): A list of asset names to retrieve prices for. If None, all assets in the specified folder_path will be used.
-    folder_path (str): The path to the folder containing the CSV files with the historical prices.
-    interested_columns (list): A list of column names to retrieve from the CSV files.
+    ...
+    time_range (datetime.timedelta): Time range to retrieve prices for. By default, the last 90 days are used.
 
     Returns:
     pandas.DataFrame: A DataFrame containing the historical prices for the specified assets.
@@ -55,6 +56,12 @@ def get_historical_prices_for_assets(
         df["time"] = pd.to_datetime(df["time"])
         df.rename(columns={"time": "date"}, inplace=True)
         df.set_index("date", inplace=True)  # Set date as index
+
+        # Trim df based on time_range
+        if time_range:
+            cutoff_date = df.index.max() - time_range  # compute cutoff date
+            df = df[df.index >= cutoff_date]  # trim df
+
         df_dict[asset_name] = df
 
     # Join all dataframes on 'time' index

@@ -1,6 +1,6 @@
 from .GeneralOptimization import GeneralOptimization
 from pypfopt.hierarchical_portfolio import HRPOpt
-from pypfopt import expected_returns
+from portfolio_optimization.data_processing.expected_returns import expected_returns
 
 
 class HRPOptimization(GeneralOptimization):
