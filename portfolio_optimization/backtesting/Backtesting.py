@@ -49,7 +49,7 @@ class Backtest:
                 )
                 historical_data = self.price_data.loc[look_back_range]
                 try:
-                    self.portfolio.rebalance(historical_data)
+                    self.portfolio.rebalance(historical_data, prices)
                 except ValueError as e:
                     print(e)
                     print(

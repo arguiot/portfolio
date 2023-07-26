@@ -6,6 +6,7 @@ from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import plotting
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 
 class Markowitz(GeneralOptimization):
@@ -66,7 +67,7 @@ class Markowitz(GeneralOptimization):
         self.ef = self.efficient_frontier()
         self.ef.max_sharpe()
         weights = self.ef.clean_weights()
-        return weights
+        return pd.Series(weights)
 
     def get_metrics(self):
         """

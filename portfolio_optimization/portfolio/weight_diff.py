@@ -1,4 +1,9 @@
-def weight_diff(old_weights, new_weights, threshold=0.01, applied=False):
+import pandas as pd
+
+
+def weight_diff(
+    old_weights: pd.Series, new_weights: pd.Series, threshold=0.01, applied=False
+):
     """
     Computes the difference between two weight dictionaries and returns a list of operations to perform to reach the new weights.
 

@@ -1,6 +1,7 @@
 from .GeneralOptimization import GeneralOptimization
 from pypfopt.hierarchical_portfolio import HRPOpt
 from portfolio_optimization.data_processing.expected_returns import expected_returns
+import pandas as pd
 
 
 class HRPOptimization(GeneralOptimization):
@@ -69,7 +70,7 @@ class HRPOptimization(GeneralOptimization):
         None
 
         """
-        self.weights = self.hrp.clean_weights()
+        self.weights = pd.Series(self.hrp.clean_weights())
 
     def get_weights(self):
         """
