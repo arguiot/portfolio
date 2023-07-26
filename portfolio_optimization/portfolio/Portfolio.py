@@ -39,9 +39,10 @@ class Portfolio:
     def rebalance(self, df: pd.DataFrame, current_prices: pd.Series):
         new_weights = self.optimiser(df).get_weights()
 
+        self.base_value = self.value(current_prices)
+
         # update self.weights and calculate the new base value
         self.weights = weight_diff(self.weights, new_weights, applied=True)
-        self.base_value = self.value(current_prices)
 
         # recalculate self.holdings based on new weights and base value
         self.holdings = self.weights * self.base_value / pd.Series(current_prices)
