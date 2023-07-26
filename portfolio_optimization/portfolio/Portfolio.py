@@ -24,8 +24,7 @@ class Portfolio:
     ):
         self.optimiser = optimiser
         self.weights = pd.Series(weights)
-        self.base_value = base_value
-        self.holdings = self.weights * self.base_value / pd.Series(initial_prices)
+        self.holdings = self.weights * base_value / pd.Series(initial_prices)
 
     def assets(self):
         """
@@ -36,16 +35,14 @@ class Portfolio:
         """
         return self.weights.index.tolist()
 
-    def rebalance(self, df: pd.DataFrame, current_prices: pd.Series):
+    def rebalance(self, df: pd.DataFrame, current_prices: pd.Series, base_value: float):
         new_weights = self.optimiser(df).get_weights()
-
-        self.base_value = self.value(current_prices)
 
         # update self.weights and calculate the new base value
         self.weights = weight_diff(self.weights, new_weights, applied=True)
 
         # recalculate self.holdings based on new weights and base value
-        self.holdings = self.weights * self.base_value / pd.Series(current_prices)
+        self.holdings = self.weights * base_value / pd.Series(current_prices)
 
     def value(self, prices: pd.Series):
         """

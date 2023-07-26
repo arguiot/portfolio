@@ -54,7 +54,7 @@ class TestPortfolio(unittest.TestCase):
 
         df = pd.DataFrame()  # DataFrame used for rebalancing
 
-        portfolio.rebalance(df, initial_prices)
+        portfolio.rebalance(df, initial_prices, base_value)
 
         # Check that new weights have been set
         expected_weights = pd.Series({"btc": 0.3, "eth": 0.3, "matic": 0.4})
@@ -93,7 +93,7 @@ class TestPortfolio(unittest.TestCase):
         )
 
         df = pd.DataFrame()  # DataFrame used for rebalancing
-        portfolio.rebalance(df, day3_prices)
+        portfolio.rebalance(df, day3_prices, 200)
 
         self.assertAlmostEqual(
             portfolio.value(pd.Series({"btc": 200, "eth": 150})), 200, delta=0.01
@@ -103,6 +103,8 @@ class TestPortfolio(unittest.TestCase):
         self.assertAlmostEqual(
             portfolio.value(pd.Series({"btc": 200, "eth": 300})), 300, delta=0.01
         )
+
+        self.assertAlmostEqual(portfolio.holdings["eth"], 2 / 3, delta=0.01)
 
 
 if __name__ == "__main__":

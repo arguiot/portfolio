@@ -30,6 +30,7 @@ class Backtest:
         )
         # DataFrame with a date index and a weight column for each rebalance date
         self.portfolio_compositions = pd.Series(name="Weights")
+        self.portfolio_holdings = pd.Series(name="Holdings")
 
     def run_backtest(self, look_back_period=4, look_back_freq="M"):
         total_dates = pd.date_range(start=self.start_date, end=self.end_date, freq="D")
@@ -41,6 +42,11 @@ class Backtest:
             # Get asset prices for the date
             prices = self.price_data.loc[date]
 
+            # Calculate and log daily portfolio value
+            self.portfolio_value.loc[date, "Portfolio Value"] = self.portfolio.value(
+                prices
+            )
+
             # Rebalance the portfolio weekly
             if date in rebalance_dates:
                 # Get the last 4 months of data up to the current date
@@ -49,7 +55,11 @@ class Backtest:
                 )
                 historical_data = self.price_data.loc[look_back_range]
                 try:
-                    self.portfolio.rebalance(historical_data, prices)
+                    self.portfolio.rebalance(
+                        historical_data,
+                        prices,
+                        self.portfolio_value.loc[date, "Portfolio Value"],
+                    )
                 except ValueError as e:
                     print(e)
                     print(
@@ -58,11 +68,8 @@ class Backtest:
                     continue
 
                 portfolio_weights = self.portfolio.weights
+                portfolio_holdings = self.portfolio.holdings
                 self.portfolio_compositions.loc[date] = portfolio_weights
-
-            # Calculate and log daily portfolio value
-            self.portfolio_value.loc[date, "Portfolio Value"] = self.portfolio.value(
-                prices
-            )
+                self.portfolio_holdings.loc[date] = portfolio_holdings
 
         return self.portfolio_value, rebalance_dates, self.portfolio_compositions
