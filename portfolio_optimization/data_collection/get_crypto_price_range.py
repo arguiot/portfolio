@@ -57,23 +57,25 @@ def get_historical_prices_for_assets(
         df.rename(columns={"time": "date"}, inplace=True)
         df.set_index("date", inplace=True)  # Set date as index
 
-        # Trim df based on time_range
-        if time_range:
-            cutoff_date = df.index.max() - time_range  # compute cutoff date
-            df = df[df.index >= cutoff_date]  # trim df
+        # If time_range is not set, create one for 3 years
+        max_date = df.index.max()
+        if not time_range or max_date - time_range > df.index.min():
+            time_range = max_date - df.index.min()
+
+        date_range = pd.date_range(start=max_date - time_range, end=max_date)
+
+        # Reindex df to fill missing dates
+        df = df.reindex(date_range, fill_value=np.nan)
 
         df_dict[asset_name] = df
 
     # Join all dataframes on 'time' index
     df_all = pd.concat(df_dict.values(), axis=1, join="inner")
 
-    # Remove rows containing NaN values
-    df_all = df_all.dropna()
-
     # Replace infinite values with NaN
     df_all.replace([np.inf, -np.inf], np.nan, inplace=True)
 
     # Remove rows containing infinite values (NaN values after previous replacement)
-    df_all = df_all.dropna()
+    # df_all = df_all.dropna()
 
     return df_all
