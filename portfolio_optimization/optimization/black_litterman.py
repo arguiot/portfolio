@@ -3,10 +3,14 @@ from pypfopt.risk_models import CovarianceShrinkage
 from pypfopt import expected_returns
 from pypfopt import black_litterman, risk_models
 from pypfopt import BlackLittermanModel, plotting
+from pypfopt import EfficientFrontier, objective_functions
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 
 
 class BlackLitterman(GeneralOptimization):
-    def __init__(self, df, cov=None, weight_bounds=(0, 1)):
+    def __init__(self, df, mcaps, views=None, cov=None, weight_bounds=(0, 1)):
         """
         Initialize the Markowitz class.
 
@@ -15,7 +19,7 @@ class BlackLitterman(GeneralOptimization):
         df : pandas.DataFrame
             A DataFrame of asset prices, where each column represents a different asset.
         """
-        super().__init__(df)
+        super().__init__(df, mcaps)
 
         self.weight_bounds = weight_bounds
 
@@ -24,7 +28,71 @@ class BlackLitterman(GeneralOptimization):
         else:
             self.cov_matrix = cov
 
-        self.rets = expected_returns.mean_historical_return(df)
+        if views is None:
+            self.views = self.compute_expected_returns()
+        else:
+            self.views = views
+
+        self.delta = black_litterman.market_implied_risk_aversion(df["btc"])
+
+        self.market_prior = black_litterman.market_implied_prior_returns(
+            self.mcaps, self.delta, self.cov_matrix
+        )
+
+    def efficient_frontier(self, rets_bl, S_bl):
+        """
+        Compute the efficient frontier for the given data.
+
+        Parameters:
+        -----------
+        rets_bl : pandas.Series
+            A pandas Series object containing the expected returns for the given data.
+        S_bl : pandas.DataFrame
+            A pandas DataFrame object containing the covariance matrix for the given data.
+
+        Returns:
+        --------
+        ef : EfficientFrontier object
+            An EfficientFrontier object containing the efficient frontier for the given data.
+        """
+        print(rets_bl, S_bl)
+        self.ef = EfficientFrontier(
+            rets_bl,
+            S_bl,
+            weight_bounds=self.weight_bounds,
+            solver="ECOS_BB",
+        )
+        self.ef.add_objective(objective_functions.L2_reg)
+        return self.ef
+
+    def get_weights(self):
+        bl = BlackLittermanModel(
+            self.cov_matrix, pi=self.market_prior, absolute_views=self.views
+        )
+
+        self.S_bl = bl.bl_cov()
+        self.ret_bl = bl.bl_returns()
+
+        self.ef = self.efficient_frontier(self.ret_bl, self.S_bl)
+        self.ef.max_sharpe()
+        weights = self.ef.clean_weights()
+        return pd.Series(weights)
+
+    def get_metrics(self):
+        """
+        Get the metrics, such as performances, for the optimized portfolio.
+
+        Returns:
+        --------
+        metrics : dict
+            A dictionary containing the metrics for the optimized portfolio.
+        """
+        metrics = self.ef.portfolio_performance(verbose=False)
+        return {
+            "apy": metrics[0],
+            "annual_volatility": metrics[1],
+            "sharpe_ratio": metrics[2],
+        }
 
     def get_cov_matrix(self):
         """
@@ -36,3 +104,48 @@ class BlackLitterman(GeneralOptimization):
             A pandas DataFrame object containing the covariance matrix for the given data.
         """
         return CovarianceShrinkage(self.df).ledoit_wolf()
+
+    def compute_expected_returns(self):
+        """
+        Compute the expected returns for the given data.
+
+        Returns:
+        --------
+        expected_returns : pandas.Series
+            A pandas Series object containing the expected returns for the given data.
+        """
+        return expected_returns.mean_historical_return(self.df, compounding=False)
+
+    def plot_frontier(self):
+        """
+        Plot the efficient frontier for the portfolio.
+
+        Returns:
+        --------
+        None
+        """
+        fig, ax = plt.subplots()
+        ef = self.efficient_frontier(self.ret_bl, self.S_bl)
+        ef_max_sharpe = ef.deepcopy()
+        plotting.plot_efficient_frontier(ef, ax=ax, show_assets=False)
+
+        # Find the tangency portfolio
+        ef_max_sharpe.max_sharpe()
+        ret_tangent, std_tangent, _ = ef_max_sharpe.portfolio_performance()
+        ax.scatter(
+            std_tangent, ret_tangent, marker="*", s=100, c="r", label="Max Sharpe"
+        )
+
+        # Generate random portfolios
+        n_samples = 15000
+        w = np.random.dirichlet(np.ones(ef.n_assets), n_samples)
+        rets = w.dot(ef.expected_returns)
+        stds = np.sqrt(np.diag(w @ ef.cov_matrix @ w.T))
+        sharpes = rets / stds
+        ax.scatter(stds, rets, marker=".", c=sharpes, cmap="viridis_r")
+
+        # Output
+        ax.set_title("Efficient Frontier with random portfolios")
+        ax.legend()
+        plt.tight_layout()
+        plt.show()

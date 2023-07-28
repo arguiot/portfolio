@@ -18,7 +18,7 @@ class Markowitz(GeneralOptimization):
         SAMPLE_COV = 1
         LEDOIT_WOLF = 2
 
-    def __init__(self, df, cov=None, weight_bounds=(0, 1)):
+    def __init__(self, df, mcaps=None, cov=None, weight_bounds=(0, 1)):
         """
         Initialize the Markowitz class.
 
@@ -27,7 +27,7 @@ class Markowitz(GeneralOptimization):
         df : pandas.DataFrame
             A DataFrame of asset prices, where each column represents a different asset.
         """
-        super().__init__(df)
+        super().__init__(df, mcaps=mcaps)
 
         self.weight_bounds = weight_bounds
         self.mode = self.Mode.LEDOIT_WOLF
@@ -41,11 +41,12 @@ class Markowitz(GeneralOptimization):
 
     def efficient_frontier(self):
         """
-        Clean the optimized weights to ensure they meet any constraints or requirements.
+        Compute the efficient frontier for the portfolio.
 
         Returns:
         --------
-        None
+        ef : EfficientFrontier object
+            An EfficientFrontier object containing the efficient frontier for the portfolio.
         """
         ef = EfficientFrontier(
             self.rets,

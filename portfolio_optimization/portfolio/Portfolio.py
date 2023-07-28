@@ -35,8 +35,19 @@ class Portfolio:
         """
         return self.weights.index.tolist()
 
-    def rebalance(self, df: pd.DataFrame, current_prices: pd.Series, base_value: float):
-        new_weights = self.optimiser(df).get_weights()
+    def rebalance(
+        self,
+        df: pd.DataFrame,
+        current_prices: pd.Series,
+        base_value: float,
+        mcaps: pd.Series = None,
+    ):
+        try:
+            new_weights = self.optimiser(df, mcaps).get_weights()
+        except ValueError as e:
+            print(e)
+            print("No rebalance performed.")
+            new_weights = self.weights  # Keep the same weights if the optimiser fails
 
         # update self.weights and calculate the new base value
         self.weights = weight_diff(self.weights, new_weights, applied=True)

@@ -6,8 +6,9 @@ class GeneralOptimization(ABC):
     Abstract base class for portfolio optimization. Subclasses should implement the `optimize`, `clean_weights`, and `get_weights` methods.
     """
 
-    def __init__(self, df):
+    def __init__(self, df, mcaps=None):
         self.df = df
+        self.mcaps = mcaps
 
     @abstractmethod
     def get_weights(self):

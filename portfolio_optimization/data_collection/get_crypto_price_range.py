@@ -40,7 +40,10 @@ def get_historical_prices_for_assets(
         try:
             df = pd.read_csv(file, usecols=["time"] + interested_columns)
             # Rename columns to include asset name for clarity
-            rename_dict = {col: f"{asset_name}" for col in interested_columns}
+            rename_dict = {
+                col: f"{asset_name}{'' if col == 'ReferenceRate' else f'_{col}'}"
+                for col in interested_columns
+            }
             df.rename(columns=rename_dict, inplace=True)
 
         except ValueError as e:

@@ -30,8 +30,8 @@ class HRPOptimization(GeneralOptimization):
 
     """
 
-    def __init__(self, df, rets=None):
-        super().__init__(df)
+    def __init__(self, df, mcaps=None, rets=None):
+        super().__init__(df, mcaps=mcaps)
         if rets is None:
             self.rets = expected_returns(df)
         else:
