@@ -26,6 +26,7 @@ class Portfolio:
         self.optimiser = optimiser
         self.weights = pd.Series(weights)
         self.holdings = self.weights * base_value / pd.Series(initial_prices)
+        self.latest_optimiser = None
 
     def assets(self):
         """
@@ -43,7 +44,8 @@ class Portfolio:
         base_value: float,
         mcaps: pd.Series = None,
     ):
-        new_weights = self.optimiser(df, mcaps).get_weights()
+        self.latest_optimiser = self.optimiser(df, mcaps)
+        new_weights = self.latest_optimiser.get_weights()
 
         if self.optimiser is VolatilityOfVolatility:
             new_weights = new_weights.clip(0, 1)
@@ -53,6 +55,35 @@ class Portfolio:
 
         # recalculate self.holdings based on new weights and base value
         self.holdings = self.weights * base_value / pd.Series(current_prices)
+
+    def get_weights(self):
+        """
+        Returns the weights of the portfolio.
+
+        Returns:
+            pd.Series: A pandas Series object representing the weights of each asset in the portfolio.
+        """
+        return self.weights
+
+    def get_holdings(self):
+        """
+        Returns the holdings of the portfolio.
+
+        Returns:
+            pd.Series: A pandas Series object representing the number of shares of each asset in the portfolio.
+        """
+        return self.holdings
+
+    def get_metrics(self):
+        """
+        Returns the metrics of the portfolio.
+
+        Returns:
+            pd.Series: A pandas Series object representing the metrics of the portfolio.
+        """
+        if self.latest_optimiser is None:
+            return None
+        return self.latest_optimiser.get_metrics()
 
     def value(self, prices: pd.Series):
         """

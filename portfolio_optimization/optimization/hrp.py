@@ -109,6 +109,8 @@ class HRPOptimization(GeneralOptimization):
             a dictionary containing the metrics for the optimized portfolio
 
         """
+        if self.hrp.weights is None:
+            return None
         metrics = self.hrp.portfolio_performance(verbose=False)
         return {
             "apy": metrics[0],

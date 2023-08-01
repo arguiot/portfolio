@@ -5,7 +5,7 @@ from portfolio_optimization.data_collection.get_crypto_price_range import (
 )
 from portfolio_optimization.portfolio.Portfolio import Portfolio
 
-from typing import Dict, Tuple
+from typing import Dict, List
 from pandas.core.frame import DataFrame, Series
 
 
@@ -17,12 +17,14 @@ class PortfolioPerformance:
         rebalance_dates: Series,
         portfolio_compositions: Series,
         portfolio_holdings: Series,
+        portfolio_metrics: Series = None,
     ):
         self.name = portfolio_name
         self.portfolio_value = portfolio_value
         self.rebalance_dates = rebalance_dates
         self.portfolio_compositions = portfolio_compositions
         self.portfolio_holdings = portfolio_holdings
+        self.portfolio_metrics = portfolio_metrics
 
 
 class Backtest:
@@ -62,6 +64,9 @@ class Backtest:
         }
         self.portfolio_holdings = {
             name: pd.Series(name="Holdings") for name in portfolios.keys()
+        }
+        self.portfolio_metrics = {
+            name: pd.Series(name="Metrics") for name in portfolios.keys()
         }
 
     def run_backtest(self, look_back_period=4, look_back_unit="M"):
@@ -104,6 +109,7 @@ class Backtest:
 
                     self.portfolio_compositions[name].loc[date] = portfolio.weights
                     self.portfolio_holdings[name].loc[date] = portfolio.holdings
+                    self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
 
             portfolio_performances.append(
                 PortfolioPerformance(
@@ -112,7 +118,84 @@ class Backtest:
                     rebalance_dates,
                     self.portfolio_compositions[name],
                     self.portfolio_holdings[name],
+                    self.portfolio_metrics[name],
                 )
             )
 
         return portfolio_performances
+
+    def export_results(
+        self, performances: List[PortfolioPerformance], folder_path: str
+    ):
+        """
+        Export the results of the backtest to an Excel file.
+        """
+        # Create a Pandas Excel writer using XlsxWriter as the engine.
+        writer = pd.ExcelWriter(
+            f"{folder_path}/backtest_results.xlsx", engine="xlsxwriter"
+        )
+
+        # For each portfolio, create a separate sheet.
+        for performance in performances:
+            # Write each DataFrame to a different worksheet.
+            performance.portfolio_value.dropna().to_excel(
+                writer, sheet_name=performance.name, startrow=3
+            )
+            print("performance.portfolio_metrics:")
+            print(performance.portfolio_metrics)
+            if performance.portfolio_metrics is not None:
+                performance.portfolio_metrics = performance.portfolio_metrics.dropna()
+                metrics = performance.portfolio_metrics.tolist()
+
+                # ensuring that metrics is not an empty list
+                if metrics:
+                    metrics_df = pd.DataFrame(metrics)
+                    metrics_df.index = performance.portfolio_metrics.index
+                    metrics_df.to_excel(
+                        writer, sheet_name=performance.name, startrow=3, startcol=5
+                    )
+
+            # Convert each item of the series to a DataFrame and then to excel
+            compositions_df = pd.DataFrame(performance.portfolio_compositions.tolist())
+            compositions_df.index = performance.portfolio_compositions.index
+            compositions_df.to_excel(
+                writer, sheet_name=performance.name, startrow=3, startcol=15
+            )
+
+            holdings__df = pd.DataFrame(performance.portfolio_holdings.tolist())
+            holdings__df.index = performance.portfolio_holdings.index
+            holdings__df.to_excel(
+                writer, sheet_name=performance.name, startrow=3, startcol=30
+            )
+
+            # Write the portfolio name at the top of the sheet
+            sheet = writer.sheets[performance.name]
+            sheet.write(0, 0, performance.name)
+
+            # Write headers for each DataFrame
+            sheet.write(2, 0, "Portfolio Value")
+            sheet.write(2, 5, "Portfolio Metrics")
+            sheet.write(2, 15, "Portfolio Compositions")
+            sheet.write(2, 30, "Portfolio Holdings")
+
+            # Calculate end row and end column for creating chart
+            end_row = performance.portfolio_value.shape[0] + 2
+            end_col = performance.portfolio_value.shape[1] - 1
+
+            # Create a new chart object
+            chart = writer.book.add_chart({"type": "line"})
+
+            # Add a series to the chart
+            chart.add_series(
+                {
+                    "name": f"='{performance.name}'!$B$3",
+                    "categories": f"='{performance.name}'!$A$4:$A${end_row}",
+                    "values": f"='{performance.name}'!$B$4:$B${end_row}",
+                }
+            )
+
+            # Insert the chart into the worksheet
+            sheet.insert_chart("G10", chart)
+
+        # Close the Pandas Excel writer and output the Excel file.
+        writer.close()

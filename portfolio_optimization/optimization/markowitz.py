@@ -79,6 +79,8 @@ class Markowitz(GeneralOptimization):
         metrics : dict
             A dictionary containing the metrics for the optimized portfolio.
         """
+        if self.ef.weights is None:
+            return None
         metrics = self.ef.portfolio_performance(verbose=False)
         return {
             "apy": metrics[0],
