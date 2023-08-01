@@ -12,7 +12,7 @@ import numpy as np
 class BlackLitterman(GeneralOptimization):
     def __init__(self, df, mcaps, views=None, cov=None, weight_bounds=(0, 1)):
         """
-        Initialize the Markowitz class.
+        Initialize the BL class.
 
         Parameters:
         -----------

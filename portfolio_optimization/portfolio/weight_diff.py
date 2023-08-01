@@ -48,7 +48,7 @@ def weight_diff(
                 operation = "Buy"
             else:  # old_weight >= 0 and diff < 0
                 operation = "Sell"
-        elif old_weight < 0:
+        else:
             if diff < 0:
                 operation = "Short"
             else:  # old_weight < 0 and diff > 0

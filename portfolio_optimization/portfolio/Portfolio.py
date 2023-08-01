@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from portfolio_optimization.optimization.GeneralOptimization import GeneralOptimization
+from portfolio_optimization.optimization.heuristic import VolatilityOfVolatility
 from typing import Type
 from .weight_diff import weight_diff
 
@@ -42,12 +43,10 @@ class Portfolio:
         base_value: float,
         mcaps: pd.Series = None,
     ):
-        try:
-            new_weights = self.optimiser(df, mcaps).get_weights()
-        except ValueError as e:
-            print(e)
-            print("No rebalance performed.")
-            new_weights = self.weights  # Keep the same weights if the optimiser fails
+        new_weights = self.optimiser(df, mcaps).get_weights()
+
+        if self.optimiser is VolatilityOfVolatility:
+            new_weights = new_weights.clip(0, 1)
 
         # update self.weights and calculate the new base value
         self.weights = weight_diff(self.weights, new_weights, applied=True)

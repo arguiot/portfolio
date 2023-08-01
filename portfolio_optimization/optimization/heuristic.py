@@ -1,14 +1,23 @@
 from .GeneralOptimization import GeneralOptimization
 import numpy as np
 import pandas as pd
+from pypfopt import expected_returns
 
 
 class Heuristic(GeneralOptimization):
-    def __init__(self, df, mcaps=None, callback=lambda df, asset: 1 / df.shape[1]):
+    def __init__(
+        self,
+        df,
+        mcaps=None,
+        pre_processing=lambda df: df.shape[1],
+        post_processing=lambda df, asset, pre_result: 1 / pre_result,
+    ):
         super().__init__(df, mcaps=mcaps)
-        self.callback = callback
+        self.pre_processing = pre_processing
+        self.post_processing = post_processing
 
     def get_weights(self):
+        print("Test")
         """
         Returns the weights for the assets in the portfolio.
 
@@ -16,8 +25,13 @@ class Heuristic(GeneralOptimization):
             pd.Series: A pandas Series object containing the weights for the assets in the portfolio.
         """
         weights = pd.Series(name="Weights")
+        partial_result = self.pre_processing(self.df)
         for asset in self.df.columns:
-            weights[asset] = self.callback(self.df, asset)
+            weights[asset] = self.post_processing(self.df, asset, partial_result)
+
+        # Normalize weights to sum to 1
+        weights = weights.fillna(0)
+        weights /= weights.sum()
         return weights
 
     def get_metrics(self):
@@ -26,11 +40,14 @@ class Heuristic(GeneralOptimization):
 
 class RiskParity(Heuristic):
     def __init__(self, df, mcaps=None):
+        # Use the apply function to calculate log returns
+        self.log_returns = expected_returns.returns_from_prices(df, log_returns=True)
+
         # Risk parity is $$\mathrm{x}_i^{R P}=\frac{1 / \sigma_t^2}{\sum_{i=1}^{\mathrm{N}}\left(1 / \sigma_l^2\right)}, \forall i$$
-        def callback(df, asset):
+        def callback(df, asset, pre_result):
             # calculate the variance of each column
-            variance = df[asset].var()
-            variances = df.var()
+            variance = self.log_returns[asset].var()
+            variances = self.log_returns.var()
             # calculate the reciprocal (1/variance) of each column
             inverse_variance = 1 / variance
             inverse_variances = 1 / variances
@@ -39,7 +56,77 @@ class RiskParity(Heuristic):
             # calculate the weight of each asset as its inverse variance divided by the total of the inverse variances
             weights = inverse_variance / total_inverse_variances
             # return the weights
-            print(weights)
             return weights
 
-        super().__init__(df, callback=callback)
+        super().__init__(df, post_processing=callback)
+
+
+class RewardToRisk(Heuristic):
+    def __init__(self, df, mcaps=None):
+        # Use the apply function to calculate log returns
+        self.log_returns = expected_returns.returns_from_prices(df, log_returns=True)
+
+        # Reward-to-risk is weight of the asset relative to its risk, measured as standard deviation of returns.
+        def callback(df, asset, pre_result):
+            # Expected return (mean) of each asset
+            mu = self.log_returns[asset].mean()
+
+            # Variance of each asset
+            variance = self.log_returns[asset].var()
+
+            # Avoid division by zero
+            if variance == 0:
+                variance = np.finfo(float).eps
+
+            # Compute weight for the current asset
+            weight = mu / variance
+
+            # Compute similar measure for all assets
+            mu_all = self.log_returns.mean()
+            variance_all = self.log_returns.var()
+
+            # Avoid division by zero
+            variance_all[variance_all == 0] = np.finfo(float).eps
+
+            weights_all = mu_all / variance_all
+
+            # Normalization factor, sum of all weights
+            total_weights = np.sum(weights_all)
+
+            # Normalize weight of current asset
+            weight /= total_weights
+
+            return max(weight, 0)
+
+        super().__init__(df, mcaps, post_processing=callback)
+
+
+class VolatilityOfVolatility(Heuristic):
+    def __init__(self, df, mcaps=None):
+        def pre_processing(df):
+            # Use the apply function to calculate log returns
+            log_returns = expected_returns.returns_from_prices(df, log_returns=True)
+            window = log_returns.rolling(window=30, min_periods=3)
+            # 1-month rolling volatility
+            vol = window.std()
+            # Volatility of volatility
+            vol_of_vol = vol.rolling(window=30).std()
+            return vol, vol_of_vol
+
+        def post_processing(df, asset, pre_result):
+            # Volatility of the asset for the last month
+            vol, vol_of_vol = pre_result
+            vol_asset = vol[asset][-1]
+            vol_of_vol_asset = vol_of_vol[asset][-1]
+            local_total_vol = vol_asset + vol_of_vol_asset
+            global_total_vol = vol[asset].sum() + vol_of_vol[asset].sum()
+
+            if global_total_vol == 0 or local_total_vol == 0:
+                return 0
+            # Weigth
+            weight = (1 / local_total_vol) / (1 / global_total_vol)
+            return weight
+
+        super().__init__(
+            df, mcaps, pre_processing=pre_processing, post_processing=post_processing
+        )

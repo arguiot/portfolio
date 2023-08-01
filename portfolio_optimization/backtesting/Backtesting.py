@@ -64,7 +64,7 @@ class Backtest:
             name: pd.Series(name="Holdings") for name in portfolios.keys()
         }
 
-    def run_backtest(self, look_back_period=4, look_back_freq="M"):
+    def run_backtest(self, look_back_period=4, look_back_unit="M"):
         total_dates = pd.date_range(start=self.start_date, end=self.end_date, freq="D")
         rebalance_dates = pd.date_range(
             start=self.start_date, end=self.end_date, freq=self.rebalance_frequency
@@ -79,13 +79,13 @@ class Backtest:
                     date, "Portfolio Value"
                 ] = portfolio.value(prices)
                 if date in rebalance_dates:
-                    look_back_range = pd.date_range(
-                        end=date, periods=look_back_period, freq=look_back_freq
+                    start = date - pd.to_timedelta(
+                        look_back_period, unit=look_back_unit
                     )
-                    historical_data = self.price_data.loc[look_back_range]
+                    historical_data = self.price_data.loc[start:date]
                     try:
                         mcaps = (
-                            self.mcaps.loc[look_back_range]
+                            self.mcaps.loc[start:date]
                             if self.mcaps is not None
                             else None
                         )
