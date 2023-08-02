@@ -36,6 +36,7 @@ class HRPOptimization(GeneralOptimization):
             self.rets = expected_returns(df)
         else:
             self.rets = rets
+        self.rets = self.rets.fillna(0)
         self.hrp = HRPOpt(self.rets)
 
     def optimize(self):

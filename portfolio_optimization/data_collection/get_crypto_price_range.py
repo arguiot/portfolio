@@ -38,7 +38,21 @@ def get_historical_prices_for_assets(
         ]  # Extract asset name from file name
 
         try:
-            df = pd.read_csv(file, usecols=["time"] + interested_columns)
+            df = pd.read_csv(file)
+            # Filter out columns not in interested_columns. If column is not in df, make the value NaN. Keep 'time' column.
+            df = df[
+                ["time"]
+                + [
+                    col
+                    for col in interested_columns
+                    if col in df.columns or col == "ReferenceRate"
+                ]
+            ]
+            # Create missing columns with NaN values
+            for col in interested_columns:
+                if col not in df.columns and col != "ReferenceRate":
+                    df[col] = np.nan
+
             # Rename columns to include asset name for clarity
             rename_dict = {
                 col: f"{asset_name}{'' if col == 'ReferenceRate' else f'_{col}'}"

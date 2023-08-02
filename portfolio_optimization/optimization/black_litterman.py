@@ -33,7 +33,8 @@ class BlackLitterman(GeneralOptimization):
         else:
             self.views = views
 
-        self.delta = black_litterman.market_implied_risk_aversion(df["btc"])
+        risk_free_asset = "btc" if "btc" in df.columns else df.columns[0]
+        self.delta = black_litterman.market_implied_risk_aversion(df[risk_free_asset])
 
         self.market_prior = black_litterman.market_implied_prior_returns(
             self.mcaps, self.delta, self.cov_matrix
@@ -65,7 +66,9 @@ class BlackLitterman(GeneralOptimization):
         self.ef.add_objective(objective_functions.L2_reg)
         return self.ef
 
-    def get_weights(self):
+    def get_weights(
+        self, risk_free_rate=-0.05
+    ):  # Risk free rate is set to -5% by default, which is the rate for the US Dollar during inflation
         bl = BlackLittermanModel(
             self.cov_matrix, pi=self.market_prior, absolute_views=self.views
         )
@@ -74,7 +77,7 @@ class BlackLitterman(GeneralOptimization):
         self.ret_bl = bl.bl_returns()
 
         self.ef = self.efficient_frontier(self.ret_bl, self.S_bl)
-        self.ef.max_sharpe()
+        self.ef.max_sharpe(risk_free_rate=risk_free_rate)
         weights = self.ef.clean_weights()
         return pd.Series(weights)
 

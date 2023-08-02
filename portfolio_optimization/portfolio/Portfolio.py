@@ -7,25 +7,32 @@ from .weight_diff import weight_diff
 
 
 class Portfolio:
-    """
-    A class representing a portfolio of assets with a given set of weights.
-
-    Attributes:
-        weights (pd.Series): A pandas Series object representing the weights of each asset in the portfolio.
-        base_value (float): The initial value of the portfolio.
-        holdings (pd.Series): A pandas Series object representing the number of shares of each asset in the portfolio.
-    """
-
     def __init__(
         self,
-        weights: pd.Series,
         base_value: float,
-        initial_prices: pd.Series,
+        initial_prices: pd.DataFrame,
         optimiser: Type[GeneralOptimization],
+        mcaps: pd.Series = None,
     ):
         self.optimiser = optimiser
-        self.weights = pd.Series(weights)
-        self.holdings = self.weights * base_value / pd.Series(initial_prices)
+        self.weights = pd.Series()
+        initial_prices = initial_prices.dropna(axis=1)
+        current_prices = initial_prices.iloc[-1]
+        # Remove keys from mcaps that are not in initial_prices columns
+        if mcaps is not None:
+            mcaps = mcaps.reindex(initial_prices.columns)
+
+        self.rebalance(
+            initial_prices,
+            current_prices,
+            base_value,
+            mcaps=mcaps,
+        )
+        # Check that the sum of holdings sum is the base value
+        assert np.isclose(self.value(current_prices), base_value), (
+            f"Initial value of portfolio is {self.value(current_prices)}, "
+            f"but expected value is {base_value}."
+        )
         self.latest_optimiser = None
 
     def assets(self):
@@ -44,6 +51,7 @@ class Portfolio:
         base_value: float,
         mcaps: pd.Series = None,
     ):
+        df = df.dropna(axis=1)
         self.latest_optimiser = self.optimiser(df, mcaps)
         new_weights = self.latest_optimiser.get_weights()
 
@@ -51,7 +59,9 @@ class Portfolio:
             new_weights = new_weights.clip(0, 1)
 
         # update self.weights and calculate the new base value
-        self.weights = weight_diff(self.weights, new_weights, applied=True)
+        self.weights = (
+            new_weights  # weight_diff(self.weights, new_weights, applied=True)
+        )
 
         # recalculate self.holdings based on new weights and base value
         self.holdings = self.weights * base_value / pd.Series(current_prices)

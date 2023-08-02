@@ -125,15 +125,16 @@ class Backtest:
         return portfolio_performances
 
     def export_results(
-        self, performances: List[PortfolioPerformance], folder_path: str
+        self,
+        performances: List[PortfolioPerformance],
+        folder_path: str,
+        file_name: str = "backtest_results.xlsx",
     ):
         """
         Export the results of the backtest to an Excel file.
         """
         # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer = pd.ExcelWriter(
-            f"{folder_path}/backtest_results.xlsx", engine="xlsxwriter"
-        )
+        writer = pd.ExcelWriter(f"{folder_path}/{file_name}", engine="xlsxwriter")
 
         # For each portfolio, create a separate sheet.
         for performance in performances:

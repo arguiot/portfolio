@@ -56,7 +56,9 @@ class Markowitz(GeneralOptimization):
         )
         return ef
 
-    def get_weights(self):
+    def get_weights(
+        self, risk_free_rate=None
+    ):  # Risk free rate is set to -5% by default, which is the rate for the US Dollar during inflation
         """
         Get the optimized portfolio weights.
 
@@ -66,7 +68,14 @@ class Markowitz(GeneralOptimization):
             A pandas Series object containing the optimized weights for each asset in the portfolio.
         """
         self.ef = self.efficient_frontier()
-        self.ef.max_sharpe()
+        risk_free_rate = (
+            min(self.ef.expected_returns) if risk_free_rate is None else risk_free_rate
+        )
+        assert max(self.ef.expected_returns) >= risk_free_rate, (
+            "Expected returns are less than the risk free rate. "
+            "This is not possible. Please check your data."
+        )
+        self.ef.max_sharpe(risk_free_rate=risk_free_rate)
         weights = self.ef.clean_weights()
         return pd.Series(weights)
 
