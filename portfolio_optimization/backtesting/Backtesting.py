@@ -136,12 +136,55 @@ class Backtest:
         # Create a Pandas Excel writer using XlsxWriter as the engine.
         writer = pd.ExcelWriter(f"{folder_path}/{file_name}", engine="xlsxwriter")
 
+        overview_df = pd.DataFrame(
+            index=[
+                "Total Return",
+                "Average Daily Return",
+                "Average Monthly Return",
+                "APY",
+                "CAGR",
+                "Sharpe Ratio",
+            ]
+        )
+
+        overview_df.to_excel(
+            writer, sheet_name="Overview", index=True
+        )  # Making sure the sheet is the first one
+
         # For each portfolio, create a separate sheet.
         for performance in performances:
             # Write each DataFrame to a different worksheet.
-            performance.portfolio_value.dropna().to_excel(
-                writer, sheet_name=performance.name, startrow=3
+            value = performance.portfolio_value.dropna()
+            # Calculate the metrics
+            value = performance.portfolio_value.dropna()
+            value["Daily Return"] = value["Portfolio Value"].pct_change()
+
+            total_return = (
+                value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0] - 1
             )
+            average_daily_return = value["Daily Return"].mean()
+            average_monthly_return = ((1 + average_daily_return) ** 30) - 1
+            apy = ((1 + average_daily_return) ** 252) - 1
+            cagr = (
+                (value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0])
+                ** (1 / (len(value) / 252))
+            ) - 1
+            sharpe_ratio = (
+                value["Daily Return"].mean() / value["Daily Return"].std()
+            ) * np.sqrt(252)
+
+            # Add to dataframe
+            overview_df[performance.name] = pd.Series(
+                {
+                    "Total Return": total_return,
+                    "Average Daily Return": average_daily_return,
+                    "Average Monthly Return": average_monthly_return,
+                    "APY": apy,
+                    "CAGR": cagr,
+                    "Sharpe Ratio": sharpe_ratio,
+                }
+            )
+            value.to_excel(writer, sheet_name=performance.name, startrow=3)
             print("performance.portfolio_metrics:")
             print(performance.portfolio_metrics)
             if performance.portfolio_metrics is not None:
@@ -183,20 +226,46 @@ class Backtest:
             end_row = performance.portfolio_value.shape[0] + 2
             end_col = performance.portfolio_value.shape[1] - 1
 
-            # Create a new chart object
-            chart = writer.book.add_chart({"type": "line"})
+        overview_df.to_excel(writer, sheet_name="Overview", index=True)
+        # Set the "Overview" sheet as the active sheet.
+        writer.sheets["Overview"].activate()
+        writer.sheets["Overview"].set_first_sheet()
 
-            # Add a series to the chart
-            chart.add_series(
-                {
-                    "name": f"='{performance.name}'!$B$3",
-                    "categories": f"='{performance.name}'!$A$4:$A${end_row}",
-                    "values": f"='{performance.name}'!$B$4:$B${end_row}",
-                }
-            )
+        # Create a dropdown list selector for the charts
+        chart_sheet = writer.sheets["Overview"]
+        chart_sheet.write(12, 1, performances[0].name)
+        chart_sheet.data_validation(
+            "B13",
+            {
+                "validate": "list",
+                "source": [portfolio.name for portfolio in performances],
+            },
+        )
 
-            # Insert the chart into the worksheet
-            sheet.insert_chart("G10", chart)
+        # Create a hidden sheet for the chart data
+        writer.sheets["Chart Data"] = writer.book.add_worksheet("Chart Data")
+        writer.sheets["Chart Data"].hide()
 
+        # Use =INDIRECT("'"&INDEX(Overview!B1:H1,1,Overview!B10)&"'!A5:"&"C"&COUNTA(INDIRECT("'"&INDEX(Overview!B1:H1,1,Overview!B10)&"'!A:A")))
+        writer.sheets["Chart Data"].write_dynamic_array_formula(
+            "A1:A1",
+            '=INDIRECT("\'"&Overview!B13&"\'!A5:"&"C"&COUNTA(INDIRECT("\'"&Overview!B13&"\'!A:A")))',
+        )
+
+        # Create a chart object
+        chart = writer.book.add_chart({"type": "line"})
+        chart.set_title({"name": "Portfolio Value"})
+        chart.set_x_axis({"name": "Date"})
+        chart.set_y_axis({"name": "Portfolio Value"})
+        chart.add_series(
+            {
+                "categories": "='Chart Data'!$A$1:$A$1000",
+                "values": "='Chart Data'!$B$1:$B$1000",
+                "name": "=Overview!$B$13",
+            }
+        )
+
+        # Insert the chart into the sheet
+        chart_sheet.insert_chart("B15", chart)
         # Close the Pandas Excel writer and output the Excel file.
         writer.close()
