@@ -137,9 +137,7 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         look_back_period=120, look_back_unit="D", yield_data=yield_data
     )
 
-    backtest.export_results(
-        perfs, "~/Downloads/", f"backtest_results_{asset_class}.xlsx"
-    )
+    backtest.export_results(perfs, "./out/", f"backtest_results_{asset_class}.xlsx")
 
 
 if __name__ == "__main__":
