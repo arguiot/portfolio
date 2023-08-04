@@ -48,15 +48,17 @@ class RiskParity(GeneralOptimization):
             {"type": "eq", "fun": self.total_weight_constraint},
             {"type": "ineq", "fun": self.long_only_constraint},
         )
+
         w0 = np.ones(self.df.shape[1]) * (1.0 / self.df.shape[1],)
         V = np.cov(self.df.T)
+
         res = minimize(
             self.risk_budget_objective,
             w0,
             args=[V, x_t],
             method="SLSQP",
             constraints=cons,
-            options={"disp": True},
+            options={"disp": True, "ftol": 1e-12},
         )
         weights = pd.Series(res.x, index=self.df.columns)
         return weights

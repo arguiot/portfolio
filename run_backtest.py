@@ -13,6 +13,9 @@ from portfolio_optimization.optimization.heuristic import (
     Heuristic,
     RewardToRisk,
     VolatilityOfVolatility,
+    ValueAtRisk,
+    RewardToVaR,
+    Combination,
 )
 
 from portfolio_optimization.portfolio.Portfolio import Portfolio
@@ -88,6 +91,24 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         optimiser=VolatilityOfVolatility,
     )
 
+    portfolio_var = Portfolio(
+        base_value=initial_bid,
+        initial_prices=df.loc[:start_date_portfolio],
+        optimiser=ValueAtRisk,
+    )
+
+    portfolio_rvar = Portfolio(
+        base_value=initial_bid,
+        initial_prices=df.loc[:start_date_portfolio],
+        optimiser=RewardToVaR,
+    )
+
+    portfolio_combination = Portfolio(
+        base_value=initial_bid,
+        initial_prices=df.loc[:start_date_portfolio],
+        optimiser=Combination,
+    )
+
     backtest = Backtest(
         portfolios={
             "HRP": porfolio_hrp,
@@ -98,6 +119,9 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
             "Heuristic": portfolio_default,
             "Reward to Risk": portfolio_rtr,
             "Volatility of Volatility": portfolio_vov,
+            "Value At Risk": portfolio_var,
+            "Reward to VaR": portfolio_rvar,
+            "Combination": portfolio_combination,
         },
         start_date=start_date_portfolio,
         end_date=df.index[-1],

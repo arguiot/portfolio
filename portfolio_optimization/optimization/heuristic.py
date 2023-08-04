@@ -100,6 +100,110 @@ class RewardToRisk(Heuristic):
         super().__init__(df, mcaps, post_processing=callback)
 
 
+class ValueAtRisk(Heuristic):
+    def __init__(self, df, mcaps=None):
+        # Use the apply function to calculate log returns
+        self.log_returns = expected_returns.returns_from_prices(df, log_returns=True)
+
+        # Value-at-risk is $$\mathrm{x}_i^{\mathrm{VaRH}}=\frac{1 / \mathrm{VaR}_{99 \%, i}}{\sum_{i=1}^{\mathrm{N}}\left(1 / \operatorname{VaR}_{99 \%, i}\right)}, \forall i$$
+        def callback(df, asset, pre_result):
+            # Calculate the 99% VaR
+            var = self.log_returns[asset].quantile(0.01)
+            vars = self.log_returns.quantile(0.01)
+            # Calculate the reciprocal (1/variance) of each column
+            inverse_var = 1 / var
+            inverse_vars = 1 / vars
+            # Calculate the sum of the inverse variances
+            total_inverse_vars = np.sum(inverse_vars)
+            # Calculate the weight of each asset as its inverse variance divided by the total of the inverse variances
+            weights = inverse_var / total_inverse_vars
+            # Return the weights
+            return weights
+
+        super().__init__(df, mcaps, post_processing=callback)
+
+
+class RewardToVaR(Heuristic):
+    def __init__(self, df, mcaps=None):
+        # Use the apply function to calculate log returns
+        self.log_returns = expected_returns.returns_from_prices(df, log_returns=True)
+
+        # Reward-to-risk is weight of the asset relative to its risk, measured as standard deviation of returns.
+        def callback(df, asset, pre_result):
+            # Expected return (mean) of each asset
+            mu = self.log_returns[asset].mean()
+
+            # Variance of each asset
+            var = self.log_returns[asset].quantile(0.01)
+
+            # Avoid division by zero
+            if var == 0:
+                var = np.finfo(float).eps
+
+            # Compute weight for the current asset
+            weight = mu / var
+
+            # Compute similar measure for all assets
+            mu_all = self.log_returns.mean()
+            var_all = self.log_returns.quantile(0.01)
+
+            # Avoid division by zero
+            var_all[var_all == 0] = np.finfo(float).eps
+
+            weights_all = mu_all / var_all
+
+            # Normalization factor, sum of all weights
+            total_weights = np.sum(weights_all)
+
+            # Normalize weight of current asset
+            weight /= total_weights
+
+            return max(weight, 0)
+
+        super().__init__(df, mcaps, post_processing=callback)
+
+
+class Combination(Heuristic):
+    def __init__(self, df, mcaps=None):
+        # We use a combination of the Default Heuristic, Fast Risk Parity, Reward To Risk, Value At Risk and Reward To VaR
+        self.default = Heuristic(df, mcaps)
+        self.fast_risk_parity = FastRiskParity(df, mcaps)
+        self.reward_to_risk = RewardToRisk(df, mcaps)
+        self.value_at_risk = ValueAtRisk(df, mcaps)
+        self.reward_to_var = RewardToVaR(df, mcaps)
+
+        def pre_processing(df):
+            return (
+                self.default.get_weights(),
+                self.fast_risk_parity.get_weights(),
+                self.reward_to_risk.get_weights(),
+                self.value_at_risk.get_weights(),
+                self.reward_to_var.get_weights(),
+            )
+
+        def post_processing(df, asset, pre_result):
+            (
+                default,
+                fast_risk_parity,
+                reward_to_risk,
+                value_at_risk,
+                reward_to_var,
+            ) = pre_result
+            # Average of the weights
+            weight = (
+                default[asset]
+                + fast_risk_parity[asset]
+                + reward_to_risk[asset]
+                + value_at_risk[asset]
+                + reward_to_var[asset]
+            ) / 5
+            return weight
+
+        super().__init__(
+            df, mcaps, pre_processing=pre_processing, post_processing=post_processing
+        )
+
+
 class VolatilityOfVolatility(Heuristic):
     def __init__(self, df, mcaps=None):
         def pre_processing(df):
