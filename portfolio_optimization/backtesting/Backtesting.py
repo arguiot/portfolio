@@ -69,7 +69,7 @@ class Backtest:
             name: pd.Series(name="Metrics") for name in portfolios.keys()
         }
 
-    def run_backtest(self, look_back_period=4, look_back_unit="M"):
+    def run_backtest(self, look_back_period=4, look_back_unit="M", yield_data=None):
         total_dates = pd.date_range(start=self.start_date, end=self.end_date, freq="D")
         rebalance_dates = pd.date_range(
             start=self.start_date, end=self.end_date, freq=self.rebalance_frequency
@@ -80,6 +80,9 @@ class Backtest:
         for name, portfolio in self.portfolios.items():
             for date in total_dates:
                 prices = self.price_data.loc[date]
+                # Apply the daily yield to the portfolio
+                if yield_data is not None:
+                    portfolio.apply_yield(yield_data, compounded=True)
                 self.portfolio_values[name].loc[
                     date, "Portfolio Value"
                 ] = portfolio.value(prices)

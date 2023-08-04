@@ -7,8 +7,9 @@ import numpy as np
 from portfolio_optimization.optimization.hrp import HRPOptimization
 from portfolio_optimization.optimization.markowitz import Markowitz
 from portfolio_optimization.optimization.black_litterman import BlackLitterman
+from portfolio_optimization.optimization.risk_parity import RiskParity
 from portfolio_optimization.optimization.heuristic import (
-    RiskParity,
+    FastRiskParity,
     Heuristic,
     RewardToRisk,
     VolatilityOfVolatility,
@@ -63,6 +64,12 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         optimiser=RiskParity,
     )
 
+    portfolio_fast_parity = Portfolio(
+        base_value=initial_bid,
+        initial_prices=df.loc[:start_date_portfolio],
+        optimiser=FastRiskParity,
+    )
+
     portfolio_default = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -87,6 +94,7 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
             "Markowitz": portfolio_markowitz,
             "BL": portfolio_bl,
             "Risk Parity": portfolio_parity,
+            "Fast Risk Parity": portfolio_fast_parity,
             "Heuristic": portfolio_default,
             "Reward to Risk": portfolio_rtr,
             "Volatility of Volatility": portfolio_vov,
@@ -98,7 +106,12 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         mcaps=mcaps,
     )
 
-    perfs = backtest.run_backtest(look_back_period=120, look_back_unit="D")
+    yield_data = pd.Series()
+    yield_data["usdc"] = 0.15  # 15% APY
+
+    perfs = backtest.run_backtest(
+        look_back_period=120, look_back_unit="D", yield_data=yield_data
+    )
 
     backtest.export_results(
         perfs, "~/Downloads/", f"backtest_results_{asset_class}.xlsx"

@@ -106,3 +106,25 @@ class Portfolio:
             float: The current value of the portfolio.
         """
         return (self.holdings * prices).sum()
+
+    def apply_yield(self, apy: pd.Series, compounded: bool = True):
+        """
+        Applies the yield of each asset to the portfolio.
+
+        Args:
+            yielded (pd.Series): A pandas Series object representing the yield of each asset in the portfolio. This is the APY that will be converted to daily yield.
+            compounded (bool, optional): Whether the yield is compounded or not. Defaults to True.
+        """
+        # Convert APY to daily yield
+        if compounded:
+            apy = (1 + apy) ** (1 / 365) - 1
+        else:
+            apy = apy / 365
+
+        # Set to 0 any undefined yield based on the current holdings
+        apy = apy.reindex(self.holdings.index).fillna(0)
+        # If yield is negative, set to 0
+        apy[apy < 0] = 0
+
+        # Calculate new holdings
+        self.holdings = self.holdings * (1 + apy)

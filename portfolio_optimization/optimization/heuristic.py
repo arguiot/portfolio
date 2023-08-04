@@ -17,7 +17,6 @@ class Heuristic(GeneralOptimization):
         self.post_processing = post_processing
 
     def get_weights(self):
-        print("Test")
         """
         Returns the weights for the assets in the portfolio.
 
@@ -38,7 +37,7 @@ class Heuristic(GeneralOptimization):
         pass
 
 
-class RiskParity(Heuristic):
+class FastRiskParity(Heuristic):
     def __init__(self, df, mcaps=None):
         # Use the apply function to calculate log returns
         self.log_returns = expected_returns.returns_from_prices(df, log_returns=True)

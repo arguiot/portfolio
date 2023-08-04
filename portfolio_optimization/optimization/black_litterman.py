@@ -56,7 +56,6 @@ class BlackLitterman(GeneralOptimization):
         ef : EfficientFrontier object
             An EfficientFrontier object containing the efficient frontier for the given data.
         """
-        print(rets_bl, S_bl)
         self.ef = EfficientFrontier(
             rets_bl,
             S_bl,
