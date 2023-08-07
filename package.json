@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "run-applescript": "^6.1.0",
+    "zx": "^7.2.3"
+  }
+}

@@ -12,6 +12,7 @@ from portfolio_optimization.optimization.heuristic import (
     FastRiskParity,
     Heuristic,
     RewardToRisk,
+    SimpleVolatility,
     VolatilityOfVolatility,
     ValueAtRisk,
     RewardToVaR,
@@ -85,6 +86,12 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         optimiser=RewardToRisk,
     )
 
+    portfolio_vo = Portfolio(
+        base_value=initial_bid,
+        initial_prices=df.loc[:start_date_portfolio],
+        optimiser=SimpleVolatility,
+    )
+
     portfolio_vov = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -118,6 +125,7 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
             "Fast Risk Parity": portfolio_fast_parity,
             "Heuristic": portfolio_default,
             "Reward to Risk": portfolio_rtr,
+            "Simple Volatility": portfolio_vo,
             "Volatility of Volatility": portfolio_vov,
             "Value At Risk": portfolio_var,
             "Reward to VaR": portfolio_rvar,

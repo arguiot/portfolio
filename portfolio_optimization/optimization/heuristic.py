@@ -233,3 +233,30 @@ class VolatilityOfVolatility(Heuristic):
         super().__init__(
             df, mcaps, pre_processing=pre_processing, post_processing=post_processing
         )
+
+
+class SimpleVolatility(Heuristic):
+    def __init__(self, df, mcaps=None):
+        def pre_processing(df):
+            # Use the apply function to calculate log returns
+            log_returns = expected_returns.returns_from_prices(df, log_returns=True)
+            window = log_returns.rolling(window=30, min_periods=3)
+            # 1-month rolling volatility
+            vol = window.std()
+            return vol
+
+        def post_processing(df, asset, pre_result):
+            # Volatility of the asset for the last month
+            vol = pre_result
+            vol_asset = vol[asset][-1]
+            global_total_vol = vol[asset].sum()
+
+            if global_total_vol == 0 or vol_asset == 0:
+                return 0
+            # Weigth
+            weight = (1 / vol_asset) / (1 / global_total_vol)
+            return weight
+
+        super().__init__(
+            df, mcaps, pre_processing=pre_processing, post_processing=post_processing
+        )
