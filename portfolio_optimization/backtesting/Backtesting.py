@@ -167,14 +167,14 @@ class Backtest:
             )
             average_daily_return = value["Daily Return"].mean()
             average_monthly_return = ((1 + average_daily_return) ** 30) - 1
-            apy = ((1 + average_daily_return) ** 252) - 1
+            apy = ((1 + average_daily_return) ** 365) - 1
             cagr = (
                 (value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0])
-                ** (1 / (len(value) / 252))
+                ** (1 / (len(value) / 365))
             ) - 1
             sharpe_ratio = (
                 value["Daily Return"].mean() / value["Daily Return"].std()
-            ) * np.sqrt(252)
+            ) * np.sqrt(365)
 
             # Add to dataframe
             overview_df[performance.name] = pd.Series(

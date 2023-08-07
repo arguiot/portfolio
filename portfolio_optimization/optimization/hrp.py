@@ -112,7 +112,7 @@ class HRPOptimization(GeneralOptimization):
         """
         if self.hrp.weights is None:
             return None
-        metrics = self.hrp.portfolio_performance(verbose=False)
+        metrics = self.hrp.portfolio_performance(verbose=False, frequency=365)
         return {
             "apy": metrics[0],
             "annual_volatility": metrics[1],

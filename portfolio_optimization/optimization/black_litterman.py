@@ -89,7 +89,7 @@ class BlackLitterman(GeneralOptimization):
         metrics : dict
             A dictionary containing the metrics for the optimized portfolio.
         """
-        metrics = self.ef.portfolio_performance(verbose=False)
+        metrics = self.ef.portfolio_performance(verbose=False, frequency=365)
         return {
             "apy": metrics[0],
             "annual_volatility": metrics[1],
