@@ -90,7 +90,7 @@ class Markowitz(GeneralOptimization):
         """
         if self.ef.weights is None:
             return None
-        metrics = self.ef.portfolio_performance(verbose=False, frequency=365)
+        metrics = self.ef.portfolio_performance(verbose=False)
         return {
             "apy": metrics[0],
             "annual_volatility": metrics[1],

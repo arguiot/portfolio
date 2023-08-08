@@ -141,10 +141,9 @@ class Backtest:
 
         overview_df = pd.DataFrame(
             index=[
-                "Total Return",
                 "Average Daily Return",
                 "Average Monthly Return",
-                "APY",
+                "Average Annual Return",
                 "CAGR",
                 "Sharpe Ratio",
             ]
@@ -162,9 +161,6 @@ class Backtest:
             value = performance.portfolio_value.dropna()
             value["Daily Return"] = value["Portfolio Value"].pct_change()
 
-            total_return = (
-                value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0] - 1
-            )
             average_daily_return = value["Daily Return"].mean()
             average_monthly_return = ((1 + average_daily_return) ** 30) - 1
             apy = ((1 + average_daily_return) ** 365) - 1
@@ -179,40 +175,39 @@ class Backtest:
             # Add to dataframe
             overview_df[performance.name] = pd.Series(
                 {
-                    "Total Return": total_return,
                     "Average Daily Return": average_daily_return,
                     "Average Monthly Return": average_monthly_return,
-                    "APY": apy,
+                    "Average Annual Return": apy,
                     "CAGR": cagr,
                     "Sharpe Ratio": sharpe_ratio,
                 }
             )
             value.to_excel(writer, sheet_name=performance.name, startrow=3)
-            print("performance.portfolio_metrics:")
-            print(performance.portfolio_metrics)
-            if performance.portfolio_metrics is not None:
-                performance.portfolio_metrics = performance.portfolio_metrics.dropna()
-                metrics = performance.portfolio_metrics.tolist()
+            # if performance.portfolio_metrics is not None:
+            #     performance.portfolio_metrics = performance.portfolio_metrics.dropna()
+            #     metrics = performance.portfolio_metrics.tolist()
 
-                # ensuring that metrics is not an empty list
-                if metrics:
-                    metrics_df = pd.DataFrame(metrics)
-                    metrics_df.index = performance.portfolio_metrics.index
-                    metrics_df.to_excel(
-                        writer, sheet_name=performance.name, startrow=3, startcol=5
-                    )
+            #     # ensuring that metrics is not an empty list
+            #     if metrics:
+            #         metrics_df = pd.DataFrame(metrics)
+            #         metrics_df.index = performance.portfolio_metrics.index
+            #         metrics_df.to_excel(
+            #             writer, sheet_name=performance.name, startrow=3, startcol=5
+            #         )
 
             # Convert each item of the series to a DataFrame and then to excel
             compositions_df = pd.DataFrame(performance.portfolio_compositions.tolist())
             compositions_df.index = performance.portfolio_compositions.index
             compositions_df.to_excel(
-                writer, sheet_name=performance.name, startrow=3, startcol=15
+                writer, sheet_name=performance.name, startrow=3, startcol=5
             )
 
             holdings__df = pd.DataFrame(performance.portfolio_holdings.tolist())
             holdings__df.index = performance.portfolio_holdings.index
+            # Start col is 5 after end of compositions
+            startcol = 10 + compositions_df.shape[1]
             holdings__df.to_excel(
-                writer, sheet_name=performance.name, startrow=3, startcol=30
+                writer, sheet_name=performance.name, startrow=3, startcol=startcol
             )
 
             # Write the portfolio name at the top of the sheet
@@ -221,9 +216,8 @@ class Backtest:
 
             # Write headers for each DataFrame
             sheet.write(2, 0, "Portfolio Value")
-            sheet.write(2, 5, "Portfolio Metrics")
-            sheet.write(2, 15, "Portfolio Compositions")
-            sheet.write(2, 30, "Portfolio Holdings")
+            sheet.write(2, 5, "Portfolio Weights")
+            sheet.write(2, startcol, "Portfolio Composition")
 
             # Calculate end row and end column for creating chart
             end_row = performance.portfolio_value.shape[0] + 2
@@ -254,6 +248,10 @@ class Backtest:
             "A1:A1",
             '=INDIRECT("\'"&Overview!B13&"\'!A5:"&"C"&COUNTA(INDIRECT("\'"&Overview!B13&"\'!A:A")))',
         )
+
+        # Format A column as dates
+        date_format = writer.book.add_format({"num_format": "yyyy-mm-dd"})
+        writer.sheets["Chart Data"].set_column("A:A", None, date_format)
 
         # Create a chart object
         chart = writer.book.add_chart({"type": "line"})

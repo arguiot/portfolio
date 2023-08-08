@@ -1,14 +1,19 @@
 #!/usr/bin/env zx
 
 import { runAppleScript } from 'run-applescript';
+import { spinner } from 'zx';
+
+$.verbose = false;
 
 // 1. Force Quit Excel
 try {
   await $`killall "Microsoft Excel"`
 } catch {}
 
-// 2. Run python script
-await $`python run_backtest.py`
+// 2. Run python script unless --skip-backtest is passed
+if (!process.argv.includes('--skip-backtest')) {
+  await spinner("Running backtest", () => $`python run_backtest.py`)
+}
 
 // 3. Open all .xlsx files and arrange windows using AppleScript
 let filePaths = [];
@@ -19,6 +24,8 @@ for (let filePath of globResult) {
     await $`open "${filePath}"`;
   }
 }
+// Wait for Excel to open all files
+await new Promise(resolve => setTimeout(resolve, 5000));
 
 // Ensuring Excel remembers the last used screen
 await runAppleScript('tell application "Microsoft Excel" to activate')

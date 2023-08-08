@@ -133,13 +133,19 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         },
         start_date=start_date_portfolio,
         end_date=df.index[-1],
-        rebalance_frequency="2M",
+        rebalance_frequency="1D",
         data=df,
         mcaps=mcaps,
     )
 
     yield_data = pd.Series()
-    yield_data["usdc"] = 0.15  # 15% APY
+    for asset in asset_list[asset_class]:
+        if asset_class == "high_risk_tickers":
+            yield_data[asset] = 0.075
+        elif asset_class == "medium_risk_tickers":
+            yield_data[asset] = 0
+        elif asset_class == "low_risk_tickers":
+            yield_data[asset] = 0.06
 
     perfs = backtest.run_backtest(
         look_back_period=120, look_back_unit="D", yield_data=yield_data

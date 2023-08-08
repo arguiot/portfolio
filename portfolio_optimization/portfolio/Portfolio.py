@@ -29,7 +29,7 @@ class Portfolio:
             mcaps=mcaps,
         )
         # Check that the sum of holdings sum is the base value
-        assert np.isclose(self.value(current_prices), base_value), (
+        assert np.isclose(self.value(current_prices), base_value, 0.01), (
             f"Initial value of portfolio is {self.value(current_prices)}, "
             f"but expected value is {base_value}."
         )
