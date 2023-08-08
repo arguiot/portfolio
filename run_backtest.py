@@ -41,18 +41,24 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
 
     start_date_portfolio = df.index[0] + relativedelta(months=5)
 
+    max_weight = 1
+    if asset_class == "high_risk_tickers":
+        max_weight = 0.15
+
     initial_bid = 1000
 
     porfolio_hrp = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=HRPOptimization,
+        max_weight=max_weight,
     )
 
     portfolio_markowitz = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Markowitz,
+        max_weight=max_weight,
     )
 
     portfolio_bl = Portfolio(
@@ -60,60 +66,70 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=BlackLitterman,
         mcaps=mcaps.loc[start_date_portfolio],
+        max_weight=max_weight,
     )
 
     portfolio_parity = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RiskParity,
+        max_weight=max_weight,
     )
 
     portfolio_fast_parity = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=FastRiskParity,
+        max_weight=max_weight,
     )
 
     portfolio_default = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Heuristic,
+        max_weight=max_weight,
     )
 
     portfolio_rtr = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RewardToRisk,
+        max_weight=max_weight,
     )
 
     portfolio_vo = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=SimpleVolatility,
+        max_weight=max_weight,
     )
 
     portfolio_vov = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=VolatilityOfVolatility,
+        max_weight=max_weight,
     )
 
     portfolio_var = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=ValueAtRisk,
+        max_weight=max_weight,
     )
 
     portfolio_rvar = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RewardToVaR,
+        max_weight=max_weight,
     )
 
     portfolio_combination = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Combination,
+        max_weight=max_weight,
     )
 
     backtest = Backtest(
@@ -133,7 +149,7 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         },
         start_date=start_date_portfolio,
         end_date=df.index[-1],
-        rebalance_frequency="1D",
+        rebalance_frequency="1W",
         data=df,
         mcaps=mcaps,
     )

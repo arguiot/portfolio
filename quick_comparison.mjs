@@ -17,7 +17,9 @@ if (!process.argv.includes('--skip-backtest')) {
 
 // 3. Open all .xlsx files and arrange windows using AppleScript
 let filePaths = [];
-let globResult = (await $`find ./out -name "*.xlsx"`).stdout.split('\n');
+let globResult = (await $`find ./out -name "*.xlsx" -type f -print0 | xargs -0 ls -tu`).stdout.split('\n');
+// Reverse the order of files so that the most recent one is opened first
+globResult = globResult.reverse();
 for (let filePath of globResult) {
   if (filePath) {
     filePaths.push(filePath);

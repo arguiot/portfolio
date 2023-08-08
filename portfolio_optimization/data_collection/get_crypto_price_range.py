@@ -76,7 +76,7 @@ def get_historical_prices_for_assets(
 
         # If time_range is not set, create one for 3 years
         max_date = df.index.max()
-        if not time_range or max_date - time_range > df.index.min():
+        if not time_range and max_date - time_range > df.index.min():
             time_range = max_date - df.index.min()
 
         date_range = pd.date_range(start=max_date - time_range, end=max_date)
@@ -91,8 +91,5 @@ def get_historical_prices_for_assets(
 
     # Replace infinite values with NaN
     df_all.replace([np.inf, -np.inf], np.nan, inplace=True)
-
-    # Remove rows containing infinite values (NaN values after previous replacement)
-    # df_all = df_all.dropna()
 
     return df_all
