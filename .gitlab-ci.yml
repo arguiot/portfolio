@@ -1,18 +1,21 @@
 stages:
   - build
 
-node_job:
+job:
   stage: build
   image: python:3.8
   before_script:
     - apt-get update && apt-get install -y curl
-    - curl -sL https://deb.nodesource.com/setup_16.x | bash -
-    - apt-get install -y nodejs
+    - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
+    - export NVM_DIR="$HOME/.nvm"
+    - [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    - nvm install 16
+    - nvm use 16
     - npm install -g zx
-    - npm install
     - pip install --upgrade pip
     - pip install -r requirements.txt
   script:
+    - npm install
     - zx ./quick_comparison.mjs
   artifacts:
     paths:
