@@ -3,7 +3,7 @@ from portfolio_optimization.data_collection import *
 from datetime import timedelta
 from tokens.get_assets import *
 import numpy as np
-
+import copy
 from portfolio_optimization.optimization.hrp import HRPOptimization
 from portfolio_optimization.optimization.markowitz import Markowitz
 from portfolio_optimization.optimization.black_litterman import BlackLitterman
@@ -44,6 +44,10 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
     max_weight = 1
     if asset_class == "high_risk_tickers":
         max_weight = 0.15
+    elif asset_class == "medium_risk_tickers":
+        max_weight = 0.05
+    elif asset_class == "low_risk_tickers":
+        max_weight = 0.3
 
     initial_bid = 1000
 
@@ -132,7 +136,7 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         max_weight=max_weight,
     )
 
-    backtest = Backtest(
+    backtest1d = Backtest(
         portfolios={
             "HRP": porfolio_hrp,
             "Markowitz": portfolio_markowitz,
@@ -149,10 +153,18 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         },
         start_date=start_date_portfolio,
         end_date=df.index[-1],
-        rebalance_frequency="1W",
+        rebalance_frequency="1D",
         data=df,
         mcaps=mcaps,
     )
+
+    # copy backtest1d to backtest1w
+    backtest1w = copy.deepcopy(backtest1d)
+    backtest1w.rebalance_frequency = "1W"
+
+    # copy backtest1d to backtest1m
+    backtest1m = copy.deepcopy(backtest1d)
+    backtest1m.rebalance_frequency = "1M"
 
     yield_data = pd.Series()
     for asset in asset_list[asset_class]:
@@ -162,12 +174,25 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
             yield_data[asset] = 0
         elif asset_class == "low_risk_tickers":
             yield_data[asset] = 0.06
-
-    perfs = backtest.run_backtest(
+    perfs_1d = backtest1d.run_backtest(
+        look_back_period=120, look_back_unit="D", yield_data=yield_data
+    )
+    perfs_1w = backtest1w.run_backtest(
+        look_back_period=120, look_back_unit="D", yield_data=yield_data
+    )
+    perfs_1m = backtest1m.run_backtest(
         look_back_period=120, look_back_unit="D", yield_data=yield_data
     )
 
-    backtest.export_results(perfs, "./out/", f"backtest_results_{asset_class}.xlsx")
+    backtest1d.export_results(
+        perfs_1d, "./out/daily/", f"backtest_results_{asset_class}.xlsx"
+    )
+    backtest1w.export_results(
+        perfs_1w, "./out/weekly/", f"backtest_results_{asset_class}.xlsx"
+    )
+    backtest1m.export_results(
+        perfs_1m, "./out/monthly/", f"backtest_results_{asset_class}.xlsx"
+    )
 
 
 if __name__ == "__main__":
@@ -175,3 +200,6 @@ if __name__ == "__main__":
     asset_classes = ["high_risk_tickers", "medium_risk_tickers", "low_risk_tickers"]
     for asset_class in asset_classes:
         run_for_asset_class(asset_list, asset_class=asset_class)
+        # Print progress
+        index = asset_classes.index(asset_class) + 1
+        print(f"[PROGRESS]: {index * 100 / len(asset_classes)}%")

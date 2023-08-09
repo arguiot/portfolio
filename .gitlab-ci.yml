@@ -1,0 +1,16 @@
+stages:
+  - build
+  
+node_job:
+  stage: build
+  image: node:latest
+  script:
+    - npm install -g zx
+    - npm install
+    - pip install -r requirements.txt
+    - zx ./quick_comparison.mjs
+  artifacts:
+    paths:
+      - out/
+    expire_in: 1 week
+    when: always

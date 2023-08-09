@@ -17,6 +17,7 @@ class Portfolio:
     ):
         self.optimiser = optimiser
         self.weights = pd.Series()
+        self.raw_weights = pd.Series()
         initial_prices = initial_prices.dropna(axis=1)
         current_prices = initial_prices.iloc[-1]
         self.max_weight = max_weight
@@ -60,6 +61,7 @@ class Portfolio:
             self.latest_optimiser.weight_bounds = (0, self.max_weight)
 
         new_weights = self.latest_optimiser.get_weights()
+        self.raw_weights = new_weights.copy()
 
         # Check and handle weights in case does not meet the 'max_weight'
         while new_weights.max() > self.max_weight:
@@ -93,7 +95,13 @@ class Portfolio:
         if self.optimiser is VolatilityOfVolatility:
             new_weights = new_weights.clip(0, 1)
 
-        self.weights = new_weights
+        assert np.isclose(new_weights.sum(), 1, 0.01), (
+            f"Sum of raw weights is {new_weights.sum()}, " f"but expected value is 1."
+        )
+        self.weights = weight_diff(self.weights, new_weights, applied=True)
+        assert np.isclose(self.weights.sum(), 1, 0.01), (
+            f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
+        )
 
         self.holdings = self.weights * base_value / pd.Series(current_prices)
 

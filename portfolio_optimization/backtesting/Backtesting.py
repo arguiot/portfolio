@@ -16,6 +16,7 @@ class PortfolioPerformance:
         portfolio_value: DataFrame,
         rebalance_dates: Series,
         portfolio_compositions: Series,
+        portfolio_raw_composition: Series,
         portfolio_holdings: Series,
         portfolio_metrics: Series = None,
     ):
@@ -23,6 +24,7 @@ class PortfolioPerformance:
         self.portfolio_value = portfolio_value
         self.rebalance_dates = rebalance_dates
         self.portfolio_compositions = portfolio_compositions
+        self.portfolio_raw_composition = portfolio_raw_composition
         self.portfolio_holdings = portfolio_holdings
         self.portfolio_metrics = portfolio_metrics
 
@@ -62,6 +64,10 @@ class Backtest:
         self.portfolio_compositions = {
             name: pd.Series(name="Weights") for name in portfolios.keys()
         }
+        self.portfolio_raw_composition = {
+            name: pd.Series(name="Raw Weights") for name in portfolios.keys()
+        }
+
         self.portfolio_holdings = {
             name: pd.Series(name="Holdings") for name in portfolios.keys()
         }
@@ -111,6 +117,9 @@ class Backtest:
                         )
 
                     self.portfolio_compositions[name].loc[date] = portfolio.weights
+                    self.portfolio_raw_composition[name].loc[
+                        date
+                    ] = portfolio.raw_weights
                     self.portfolio_holdings[name].loc[date] = portfolio.holdings
                     self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
 
@@ -120,6 +129,7 @@ class Backtest:
                     self.portfolio_values[name],
                     rebalance_dates,
                     self.portfolio_compositions[name],
+                    self.portfolio_raw_composition[name],
                     self.portfolio_holdings[name],
                     self.portfolio_metrics[name],
                 )
@@ -183,6 +193,11 @@ class Backtest:
                 }
             )
             value.to_excel(writer, sheet_name=performance.name, startrow=3)
+            # Write the portfolio name at the top of the sheet
+            sheet = writer.sheets[performance.name]
+            sheet.write(0, 0, performance.name)
+
+            sheet.write(2, 0, "Portfolio Value")
             # if performance.portfolio_metrics is not None:
             #     performance.portfolio_metrics = performance.portfolio_metrics.dropna()
             #     metrics = performance.portfolio_metrics.tolist()
@@ -196,28 +211,31 @@ class Backtest:
             #         )
 
             # Convert each item of the series to a DataFrame and then to excel
+            sheet.write(2, 5, "Portfolio Weights")
             compositions_df = pd.DataFrame(performance.portfolio_compositions.tolist())
             compositions_df.index = performance.portfolio_compositions.index
             compositions_df.to_excel(
                 writer, sheet_name=performance.name, startrow=3, startcol=5
             )
 
-            holdings__df = pd.DataFrame(performance.portfolio_holdings.tolist())
-            holdings__df.index = performance.portfolio_holdings.index
-            # Start col is 5 after end of compositions
             startcol = 10 + compositions_df.shape[1]
-            holdings__df.to_excel(
+            sheet.write(2, startcol, "Portfolio Raw Weights")
+            raw_compositions_df = pd.DataFrame(
+                performance.portfolio_raw_composition.tolist()
+            )
+            raw_compositions_df.index = performance.portfolio_raw_composition.index
+            raw_compositions_df.to_excel(
                 writer, sheet_name=performance.name, startrow=3, startcol=startcol
             )
 
-            # Write the portfolio name at the top of the sheet
-            sheet = writer.sheets[performance.name]
-            sheet.write(0, 0, performance.name)
-
-            # Write headers for each DataFrame
-            sheet.write(2, 0, "Portfolio Value")
-            sheet.write(2, 5, "Portfolio Weights")
+            holdings__df = pd.DataFrame(performance.portfolio_holdings.tolist())
+            holdings__df.index = performance.portfolio_holdings.index
+            # Start col is 5 after end of compositions
+            startcol += 5 + compositions_df.shape[1]
             sheet.write(2, startcol, "Portfolio Composition")
+            holdings__df.to_excel(
+                writer, sheet_name=performance.name, startrow=3, startcol=startcol
+            )
 
             # Calculate end row and end column for creating chart
             end_row = performance.portfolio_value.shape[0] + 2
