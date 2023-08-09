@@ -8,7 +8,7 @@ job:
     - apt-get update && apt-get install -y curl
     - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
     - export NVM_DIR="$HOME/.nvm"
-    - [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    - '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
     - nvm install 16
     - nvm use 16
     - npm install -g zx
@@ -19,6 +19,6 @@ job:
     - zx ./quick_comparison.mjs
   artifacts:
     paths:
-      - out/
+  	 - out/
     expire_in: 1 week
     when: always
