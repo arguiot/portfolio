@@ -3,7 +3,7 @@ stages:
 
 job:
   stage: build
-  image: python:3.8
+  image: python:3.11
   before_script:
     - apt-get update && apt-get install -y curl
     - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
