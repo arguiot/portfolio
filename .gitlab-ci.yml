@@ -1,13 +1,18 @@
 stages:
   - build
-  
+
 node_job:
   stage: build
-  image: node:latest
-  script:
+  image: python:3.8
+  before_script:
+    - apt-get update && apt-get install -y curl
+    - curl -sL https://deb.nodesource.com/setup_16.x | bash -
+    - apt-get install -y nodejs
     - npm install -g zx
     - npm install
+    - pip install --upgrade pip
     - pip install -r requirements.txt
+  script:
     - zx ./quick_comparison.mjs
   artifacts:
     paths:
