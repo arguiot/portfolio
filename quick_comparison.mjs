@@ -32,7 +32,10 @@ const runBacktestWithProgressBar = () => new Promise((resolve, reject) => {
   });
 
   pythonProcess.stderr.on('data', (data) => {
-    // console.error(`stderr: ${data}`);
+    // Write data to file without blocking
+    fs.appendFile('out/run_backtest.log', data, (err) => {
+      if (err) throw err; // Optional; depends on whether you want to handle errors here
+    });
   });
 
   pythonProcess.on('close', (code) => {
