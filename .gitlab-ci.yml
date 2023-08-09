@@ -19,6 +19,6 @@ job:
     - zx ./quick_comparison.mjs
   artifacts:
     paths:
-  	 - out/
+      - out/
     expire_in: 1 week
     when: always
