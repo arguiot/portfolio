@@ -4,6 +4,7 @@ from datetime import timedelta
 from tokens.get_assets import *
 import numpy as np
 import copy
+import sys
 from portfolio_optimization.optimization.hrp import HRPOptimization
 from portfolio_optimization.optimization.markowitz import Markowitz
 from portfolio_optimization.optimization.black_litterman import BlackLitterman
@@ -24,7 +25,12 @@ from portfolio_optimization.backtesting.Backtesting import Backtest
 from dateutil.relativedelta import relativedelta
 
 
-def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
+def run_for_asset_class(
+    asset_list,
+    asset_class="high_risk_tickers",
+    show_progress=False,
+    rebalance_frequency="1D",
+):
     _df = get_historical_prices_for_assets(
         asset_list[asset_class],
         time_range=timedelta(days=365 * 3),
@@ -136,7 +142,9 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         max_weight=max_weight,
     )
 
-    backtest1d = Backtest(
+    print(f"[REBALANCE FREQUENCY]: {rebalance_frequency}")
+
+    backtest = Backtest(
         portfolios={
             "HRP": porfolio_hrp,
             "Markowitz": portfolio_markowitz,
@@ -153,18 +161,10 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
         },
         start_date=start_date_portfolio,
         end_date=df.index[-1],
-        rebalance_frequency="1D",
+        rebalance_frequency=rebalance_frequency,
         data=df,
         mcaps=mcaps,
     )
-
-    # copy backtest1d to backtest1w
-    backtest1w = copy.deepcopy(backtest1d)
-    backtest1w.rebalance_frequency = "1W"
-
-    # copy backtest1d to backtest1m
-    backtest1m = copy.deepcopy(backtest1d)
-    backtest1m.rebalance_frequency = "1M"
 
     yield_data = pd.Series()
     for asset in asset_list[asset_class]:
@@ -174,32 +174,53 @@ def run_for_asset_class(asset_list, asset_class="high_risk_tickers"):
             yield_data[asset] = 0
         elif asset_class == "low_risk_tickers":
             yield_data[asset] = 0.06
-    perfs_1d = backtest1d.run_backtest(
+
+    if show_progress:
+        print(f"[PROGRESS]: 10%")
+
+    perfs = backtest.run_backtest(
         look_back_period=120, look_back_unit="D", yield_data=yield_data
     )
-    perfs_1w = backtest1w.run_backtest(
-        look_back_period=120, look_back_unit="D", yield_data=yield_data
-    )
-    perfs_1m = backtest1m.run_backtest(
-        look_back_period=120, look_back_unit="D", yield_data=yield_data
+    if show_progress:
+        print(f"[PROGRESS]: 90%")
+
+    # Check if the directory exists, if not, create it
+    if not os.path.exists(f"./out/{rebalance_frequency}/"):
+        os.makedirs(f"./out/{rebalance_frequency}/")
+
+    backtest.export_results(
+        perfs, f"./out/{rebalance_frequency}/", f"backtest_results_{asset_class}.xlsx"
     )
 
-    backtest1d.export_results(
-        perfs_1d, "./out/daily/", f"backtest_results_{asset_class}.xlsx"
-    )
-    backtest1w.export_results(
-        perfs_1w, "./out/weekly/", f"backtest_results_{asset_class}.xlsx"
-    )
-    backtest1m.export_results(
-        perfs_1m, "./out/monthly/", f"backtest_results_{asset_class}.xlsx"
-    )
+    if show_progress:
+        print(f"[PROGRESS]: 100%")
 
 
 if __name__ == "__main__":
     asset_list = get_tickers()
-    asset_classes = ["high_risk_tickers", "medium_risk_tickers", "low_risk_tickers"]
-    for asset_class in asset_classes:
-        run_for_asset_class(asset_list, asset_class=asset_class)
-        # Print progress
-        index = asset_classes.index(asset_class) + 1
-        print(f"[PROGRESS]: {index * 100 / len(asset_classes)}%")
+    # Get `--rebalance <frequency>` flag
+    if "--rebalance" in sys.argv:
+        rebalance_frequency = sys.argv[sys.argv.index("--rebalance") + 1]
+    # If the CLI is called with the `--class <asset_class>` flag, run the backtest for the specified asset class
+    if "--class" in sys.argv:
+        asset_class = sys.argv[sys.argv.index("--class") + 1]
+        run_for_asset_class(
+            asset_list,
+            asset_class=asset_class,
+            show_progress=True,
+            rebalance_frequency=rebalance_frequency,
+        )
+        sys.exit()
+    else:
+        # Otherwise, run the backtest for all asset classes
+        asset_classes = ["high_risk_tickers", "medium_risk_tickers", "low_risk_tickers"]
+        for asset_class in asset_classes:
+            run_for_asset_class(
+                asset_list,
+                asset_class=asset_class,
+                show_progress=True,
+                rebalance_frequency=rebalance_frequency,
+            )
+            # Print progress
+            index = asset_classes.index(asset_class) + 1
+            print(f"[PROGRESS]: {index * 100 / len(asset_classes)}%")

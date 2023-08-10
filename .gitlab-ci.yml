@@ -1,13 +1,10 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-stages:
-  - build
 
-job:
-  stage: build
+default:
   image: python:3.11
   before_script:
-    - apt-get update && apt-get install -y curl
+    - apt-get update && apt-get install -y curl zip
     - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.38.0/install.sh | bash
     - export NVM_DIR="$HOME/.nvm"
     - '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
@@ -16,15 +13,53 @@ job:
     - npm install -g zx
     - pip install --upgrade pip
     - pip install -r requirements.txt
-  script:
     - npm install
-    - mkdir out
-    - mkdir out/daily
-    - mkdir out/weekly
-    - mkdir out/monthly
-    - zx ./quick_comparison.mjs
+
+
+stages:
+  - build
+  - archive
+
+daily_job:
+  stage: build
+  timeout: 3h
+  script:
+    - mkdir -p out/1D
+    - zx ./quick_comparison.mjs --rebalance 1D
   artifacts:
     paths:
-      - out/
+      - out/1D/
+    expire_in: 1 week
+    when: always
+
+weekly_job:
+  stage: build
+  script:
+    - mkdir -p out/1W
+    - zx ./quick_comparison.mjs --rebalance 1W
+  artifacts:
+    paths:
+      - out/1W/
+    expire_in: 1 week
+    when: always
+
+monthly_job:
+  stage: build
+  script:
+    - mkdir -p out/1M
+    - zx ./quick_comparison.mjs --rebalance 1M
+  artifacts:
+    paths:
+      - out/1M/
+    expire_in: 1 week
+    when: always
+  
+archive_job:
+  stage: archive
+  script:
+    - zip -r out.zip out/
+  artifacts:
+    paths:
+      - out.zip
     expire_in: 1 week
     when: always

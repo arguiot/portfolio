@@ -8,6 +8,10 @@ const cliProgress = require('cli-progress');
 
 $.verbose = false;
 
+// If `--rebalance <period>` is specified, pass it to the Python script
+const rebalanceIndex = process.argv.indexOf('--rebalance');
+const rebalancePeriod = rebalanceIndex !== -1 ? process.argv[rebalanceIndex + 1] : '';
+
 const runBacktestWithProgressBar = () => new Promise((resolve, reject) => {
   // Create a new progress bar instance
   const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
@@ -16,7 +20,18 @@ const runBacktestWithProgressBar = () => new Promise((resolve, reject) => {
   fs.writeFile('out/run_backtest.log', '', (err) => {
     if (err) throw err; // Optional; depends on whether you want to handle errors here
   });
-  const pythonProcess = spawn('python', ['run_backtest.py']);
+  // If `--class <asset_class>` is specified, pass it to the Python script
+  const assetClassIndex = process.argv.indexOf('--class');
+  const assetClass = assetClassIndex !== -1 ? process.argv[assetClassIndex + 1] : '';
+  // Construct the arguments to pass to the Python script
+  const args = ['run_backtest.py'];
+  if (assetClass) {
+    args.push('--class', assetClass);
+  }
+  if (rebalancePeriod) {
+    args.push('--rebalance', rebalancePeriod);
+  }
+  const pythonProcess = spawn('python', args);
 
   pythonProcess.stdout.on('data', (data) => {
     // Extract the percentage from the string, assuming the format is always [PROGRESS]: X%
@@ -62,9 +77,11 @@ if (!process.argv.includes('--skip-backtest')) {
 
 // 3. Open all .xlsx files and arrange windows using AppleScript
 let filePaths = [];
-let globResult = (await $`find ./out/daily -name "*.xlsx" -type f -print0 | xargs -0 ls -tu`).stdout.split('\n');
+
+let globResult = (await $`find ./out/${rebalancePeriod} -name "*.xlsx" -type f -print0 | xargs -0 ls -tu`).stdout.split('\n');
 // Reverse the order of files so that the most recent one is opened first
-globResult = globResult.reverse();
+globResult = globResult.reverse().filter((filePath) => !filePath.includes('~$')); // Remove temporary files
+console.log(`📂 Found ${globResult.length} files`);
 for (let filePath of globResult) {
   if (filePath) {
     filePaths.push(filePath);
