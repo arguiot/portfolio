@@ -210,6 +210,8 @@ if __name__ == "__main__":
     # Get `--rebalance <frequency>` flag
     if "--rebalance" in sys.argv:
         rebalance_frequency = sys.argv[sys.argv.index("--rebalance") + 1]
+    else:
+        rebalance_frequency = "1M"
     # If the CLI is called with the `--class <asset_class>` flag, run the backtest for the specified asset class
     if "--class" in sys.argv:
         asset_class = sys.argv[sys.argv.index("--class") + 1]

@@ -12,7 +12,7 @@ class Portfolio:
         base_value: float,
         initial_prices: pd.DataFrame,
         optimiser: Type[GeneralOptimization],
-        mcaps: pd.Series = None,
+        mcaps: pd.Series | pd.DataFrame = None,
         max_weight: float = 1.0,
         weight_threshold: float = 0.01,
     ):
@@ -26,12 +26,14 @@ class Portfolio:
         # Remove keys from mcaps that are not in initial_prices columns
         if mcaps is not None:
             mcaps = mcaps.reindex(initial_prices.columns)
-
+        local_mcaps = mcaps
+        if isinstance(mcaps, pd.DataFrame):
+            local_mcaps = mcaps.loc[0]
         self.rebalance(
             initial_prices,
             current_prices,
             base_value,
-            mcaps=mcaps,
+            mcaps=local_mcaps,
         )
         # Check that the sum of holdings sum is the base value
         assert np.isclose(self.value(current_prices), base_value, 0.01), (
@@ -78,6 +80,9 @@ class Portfolio:
 
             # Drop the asset in new_weights from df
             df_rest = df.drop(new_weights.index, axis=1)
+            mcaps_rest = None
+            if mcaps is not None:
+                mcaps_rest = mcaps.drop(new_weights.index, axis=0)
 
             if df_rest.shape[1] == 1:
                 # We set the weight to the remaining weight (1 - sum of weights)
@@ -86,7 +91,7 @@ class Portfolio:
                 break
 
             # Re-run the optimiser on the rest of the assets
-            local_optimiser = self.optimiser(df_rest, mcaps)
+            local_optimiser = self.optimiser(df_rest, mcaps_rest)
             new_weights_rest = local_optimiser.get_weights()
 
             # Normalize the weight so that the sum of weights is 1. We look at the sum of `new_weights`, and we make sure that the sum of `new_weights_rest` is 1 - sum of `new_weights`

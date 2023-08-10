@@ -98,11 +98,7 @@ class Backtest:
                     )
                     historical_data = self.price_data.loc[start:date]
                     try:
-                        mcaps = (
-                            self.mcaps.loc[start:date]
-                            if self.mcaps is not None
-                            else None
-                        )
+                        mcaps = self.mcaps.loc[date] if self.mcaps is not None else None
 
                         portfolio.rebalance(
                             historical_data,

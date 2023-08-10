@@ -10,7 +10,7 @@ import numpy as np
 
 
 class BlackLitterman(GeneralOptimization):
-    def __init__(self, df, mcaps, views=None, cov=None, weight_bounds=(0, 1)):
+    def __init__(self, df, mcaps, views=None, cov=None):
         """
         Initialize the BL class.
 
@@ -20,8 +20,6 @@ class BlackLitterman(GeneralOptimization):
             A DataFrame of asset prices, where each column represents a different asset.
         """
         super().__init__(df, mcaps)
-
-        self.weight_bounds = weight_bounds
 
         if cov is None:
             self.cov_matrix = self.get_cov_matrix()
@@ -35,6 +33,9 @@ class BlackLitterman(GeneralOptimization):
 
         risk_free_asset = "btc" if "btc" in df.columns else df.columns[0]
         self.delta = black_litterman.market_implied_risk_aversion(df[risk_free_asset])
+
+        # Drop all rows in mcaps that are not in cov_matrix
+        self.mcaps = self.mcaps[self.cov_matrix.columns]
 
         self.market_prior = black_litterman.market_implied_prior_returns(
             self.mcaps, self.delta, self.cov_matrix
@@ -59,7 +60,10 @@ class BlackLitterman(GeneralOptimization):
         self.ef = EfficientFrontier(
             rets_bl,
             S_bl,
-            weight_bounds=self.weight_bounds,
+            weight_bounds=(
+                0,
+                1,
+            ),  # The optimzer is not good at handling constraints, so we set the bounds to (0, 1) and use the `clean_weights` method to remove any assets with zero weight
             solver="ECOS_BB",
         )
         self.ef.add_objective(objective_functions.L2_reg)
@@ -76,6 +80,7 @@ class BlackLitterman(GeneralOptimization):
         self.ret_bl = bl.bl_returns()
 
         self.ef = self.efficient_frontier(self.ret_bl, self.S_bl)
+        risk_free_rate = min(min(self.ef.expected_returns), risk_free_rate)
         self.ef.max_sharpe(risk_free_rate=risk_free_rate)
         weights = self.ef.clean_weights()
         return pd.Series(weights)
@@ -89,7 +94,9 @@ class BlackLitterman(GeneralOptimization):
         metrics : dict
             A dictionary containing the metrics for the optimized portfolio.
         """
-        metrics = self.ef.portfolio_performance(verbose=False, frequency=365)
+        if self.ef.weights is None:
+            return None
+        metrics = self.ef.portfolio_performance(verbose=False)
         return {
             "apy": metrics[0],
             "annual_volatility": metrics[1],
