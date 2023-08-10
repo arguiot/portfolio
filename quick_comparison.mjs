@@ -80,7 +80,7 @@ let filePaths = [];
 
 let globResult = (await $`find ./out/${rebalancePeriod} -name "*.xlsx" -type f -print0 | xargs -0 ls -tu`).stdout.split('\n');
 // Reverse the order of files so that the most recent one is opened first
-globResult = globResult.reverse().filter((filePath) => !filePath.includes('~$')); // Remove temporary files
+globResult = globResult.reverse().filter((filePath) => !filePath.contains('~$')); // Remove temporary files
 console.log(`📂 Found ${globResult.length} files`);
 for (let filePath of globResult) {
   if (filePath) {

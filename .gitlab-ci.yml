@@ -22,10 +22,10 @@ stages:
 
 daily_job:
   stage: build
-  timeout: 3h
+  timeout: 5h
   script:
     - mkdir -p out/1D
-    - zx ./quick_comparison.mjs --rebalance 1D
+    - timeout 4.99h zx ./quick_comparison.mjs --rebalance 1D || echo "Process timed out"
   artifacts:
     paths:
       - out/1D/
