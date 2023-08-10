@@ -1,5 +1,5 @@
-import numpy as np
 import pandas as pd
+from multiprocessing import Pool
 from portfolio_optimization.data_collection.get_crypto_price_range import (
     get_historical_prices_for_assets,
 )
@@ -75,6 +75,57 @@ class Backtest:
             name: pd.Series(name="Metrics") for name in portfolios.keys()
         }
 
+    def process_portfolio(
+        self,
+        name,
+        portfolio,
+        total_dates,
+        rebalance_dates,
+        look_back_period,
+        look_back_unit,
+        yield_data,
+    ):
+        for date in total_dates:
+            prices = self.price_data.loc[date]
+            # Apply the daily yield to the portfolio
+            if yield_data is not None:
+                portfolio.apply_yield(yield_data, compounded=True)
+            self.portfolio_values[name].loc[date, "Portfolio Value"] = portfolio.value(
+                prices
+            )
+            if date in rebalance_dates:
+                start = date - pd.to_timedelta(look_back_period, unit=look_back_unit)
+                historical_data = self.price_data.loc[start:date]
+                try:
+                    mcaps = self.mcaps.loc[date] if self.mcaps is not None else None
+
+                    portfolio.rebalance(
+                        historical_data,
+                        prices,
+                        self.portfolio_values[name].loc[date, "Portfolio Value"],
+                        mcaps,
+                    )
+                except ValueError as e:
+                    print(e)
+                    print(
+                        f"Skipping rebalance on {date.strftime('%Y-%m-%d')} due to insufficient data."
+                    )
+
+                self.portfolio_compositions[name].loc[date] = portfolio.weights
+                self.portfolio_raw_composition[name].loc[date] = portfolio.raw_weights
+                self.portfolio_holdings[name].loc[date] = portfolio.holdings
+                self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
+        print(f"Finished processing {name}")
+        return PortfolioPerformance(
+            name,
+            self.portfolio_values[name],
+            rebalance_dates,
+            self.portfolio_compositions[name],
+            self.portfolio_raw_composition[name],
+            self.portfolio_holdings[name],
+            self.portfolio_metrics[name],
+        )
+
     def run_backtest(self, look_back_period=4, look_back_unit="M", yield_data=None):
         total_dates = pd.date_range(start=self.start_date, end=self.end_date, freq="D")
         rebalance_dates = pd.date_range(
@@ -83,52 +134,21 @@ class Backtest:
 
         portfolio_performances = []
 
-        for name, portfolio in self.portfolios.items():
-            for date in total_dates:
-                prices = self.price_data.loc[date]
-                # Apply the daily yield to the portfolio
-                if yield_data is not None:
-                    portfolio.apply_yield(yield_data, compounded=True)
-                self.portfolio_values[name].loc[
-                    date, "Portfolio Value"
-                ] = portfolio.value(prices)
-                if date in rebalance_dates:
-                    start = date - pd.to_timedelta(
-                        look_back_period, unit=look_back_unit
+        with Pool() as p:
+            portfolio_performances = p.starmap(
+                self.process_portfolio,
+                [
+                    (
+                        name,
+                        portfolio,
+                        total_dates,
+                        rebalance_dates,
+                        look_back_period,
+                        look_back_unit,
+                        yield_data,
                     )
-                    historical_data = self.price_data.loc[start:date]
-                    try:
-                        mcaps = self.mcaps.loc[date] if self.mcaps is not None else None
-
-                        portfolio.rebalance(
-                            historical_data,
-                            prices,
-                            self.portfolio_values[name].loc[date, "Portfolio Value"],
-                            mcaps,
-                        )
-                    except ValueError as e:
-                        print(e)
-                        print(
-                            f"Skipping rebalance on {date.strftime('%Y-%m-%d')} due to insufficient data."
-                        )
-
-                    self.portfolio_compositions[name].loc[date] = portfolio.weights
-                    self.portfolio_raw_composition[name].loc[
-                        date
-                    ] = portfolio.raw_weights
-                    self.portfolio_holdings[name].loc[date] = portfolio.holdings
-                    self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
-
-            portfolio_performances.append(
-                PortfolioPerformance(
-                    name,
-                    self.portfolio_values[name],
-                    rebalance_dates,
-                    self.portfolio_compositions[name],
-                    self.portfolio_raw_composition[name],
-                    self.portfolio_holdings[name],
-                    self.portfolio_metrics[name],
-                )
+                    for name, portfolio in self.portfolios.items()
+                ],
             )
 
         return portfolio_performances

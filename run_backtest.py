@@ -206,6 +206,9 @@ def run_for_asset_class(
 
 
 if __name__ == "__main__":
+    import warnings
+
+    warnings.filterwarnings("ignore")
     asset_list = get_tickers()
     # Get `--rebalance <frequency>` flag
     if "--rebalance" in sys.argv:

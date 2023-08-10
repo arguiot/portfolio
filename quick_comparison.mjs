@@ -71,7 +71,15 @@ try {
 } catch { }
 
 if (!process.argv.includes('--skip-backtest')) {
+  // Time the backtest
+  console.log("⏱️ Starting backtest");
+  const startTime = new Date();
   await runBacktestWithProgressBar();
+  const endTime = new Date();
+  const timeDiff = endTime - startTime;
+  const seconds = Math.round(timeDiff / 1000);
+  const minutes = Math.round(seconds / 60);
+  console.log(`⏱️ Backtest took ${minutes} minutes and ${seconds % 60} seconds`);
   console.log("✅ Backtest done");
 }
 

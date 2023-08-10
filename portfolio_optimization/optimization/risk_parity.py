@@ -58,7 +58,7 @@ class RiskParity(GeneralOptimization):
             args=[V, x_t],
             method="SLSQP",
             constraints=cons,
-            options={"disp": True, "ftol": 1e-12},
+            options={"disp": True, "ftol": 1e-9},
         )
         weights = pd.Series(res.x, index=self.df.columns)
         return weights
