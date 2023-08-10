@@ -105,7 +105,7 @@ class Backtest:
                         self.portfolio_values[name].loc[date, "Portfolio Value"],
                         mcaps,
                     )
-                except ValueError as e:
+                except Exception as e:
                     print(e)
                     print(
                         f"Skipping rebalance on {date.strftime('%Y-%m-%d')} due to insufficient data."
