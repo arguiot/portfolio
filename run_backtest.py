@@ -55,6 +55,15 @@ def run_for_asset_class(
     elif asset_class == "low_risk_tickers":
         max_weight = 0.3
 
+    weight_threshold = 0.01
+
+    if asset_class == "high_risk_tickers":
+        weight_threshold = 0.05
+    elif asset_class == "medium_risk_tickers":
+        weight_threshold = 0.03
+    elif asset_class == "low_risk_tickers":
+        weight_threshold = 0.01
+
     initial_bid = 1000
 
     porfolio_hrp = Portfolio(

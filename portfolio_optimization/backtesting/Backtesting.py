@@ -151,11 +151,13 @@ class Backtest:
 
         overview_df = pd.DataFrame(
             index=[
+                "Total Return",
                 "Average Daily Return",
                 "Average Monthly Return",
                 "Average Annual Return",
                 "CAGR",
                 "Sharpe Ratio",
+                "Volatility",
             ]
         )
 
@@ -171,6 +173,10 @@ class Backtest:
             value = performance.portfolio_value.dropna()
             value["Daily Return"] = value["Portfolio Value"].pct_change()
 
+            total_return = (
+                value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0] - 1
+            )
+
             average_daily_return = value["Daily Return"].mean()
             average_monthly_return = ((1 + average_daily_return) ** 30) - 1
             apy = ((1 + average_daily_return) ** 365) - 1
@@ -178,21 +184,27 @@ class Backtest:
                 (value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0])
                 ** (1 / (len(value) / 365))
             ) - 1
-            sharpe_ratio = (
-                value["Daily Return"].mean() / value["Daily Return"].std()
-            ) * np.sqrt(365)
+            # sharpe_ratio = (
+            #     value["Daily Return"].mean() / value["Daily Return"].std()
+            # ) * np.sqrt(365)
+            sharpe_ratio_formula = f"=(AVERAGE('{performance.name}'!C:C)/STDEV('{performance.name}'!C:C)-$B$11)*SQRT(365)"
+
+            volatility = value["Daily Return"].std()
 
             # Add to dataframe
             overview_df[performance.name] = pd.Series(
                 {
+                    "Total Return": total_return,
                     "Average Daily Return": average_daily_return,
                     "Average Monthly Return": average_monthly_return,
                     "Average Annual Return": apy,
                     "CAGR": cagr,
-                    "Sharpe Ratio": sharpe_ratio,
+                    "Sharpe Ratio": sharpe_ratio_formula,
+                    "Volatility": volatility,
                 }
             )
             value.to_excel(writer, sheet_name=performance.name, startrow=3)
+
             # Write the portfolio name at the top of the sheet
             sheet = writer.sheets[performance.name]
             sheet.write(0, 0, performance.name)
@@ -248,6 +260,9 @@ class Backtest:
 
         # Create a dropdown list selector for the charts
         chart_sheet = writer.sheets["Overview"]
+
+        chart_sheet.write(10, 0, "Risk Free Rate")
+        chart_sheet.write(10, 1, 0.02)
         chart_sheet.write(12, 1, performances[0].name)
         chart_sheet.data_validation(
             "B13",

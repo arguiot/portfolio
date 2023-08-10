@@ -14,6 +14,7 @@ class Portfolio:
         optimiser: Type[GeneralOptimization],
         mcaps: pd.Series = None,
         max_weight: float = 1.0,
+        weight_threshold: float = 0.01,
     ):
         self.optimiser = optimiser
         self.weights = pd.Series()
@@ -21,6 +22,7 @@ class Portfolio:
         initial_prices = initial_prices.dropna(axis=1)
         current_prices = initial_prices.iloc[-1]
         self.max_weight = max_weight
+        self.weight_threshold = weight_threshold
         # Remove keys from mcaps that are not in initial_prices columns
         if mcaps is not None:
             mcaps = mcaps.reindex(initial_prices.columns)
@@ -98,7 +100,9 @@ class Portfolio:
         assert np.isclose(new_weights.sum(), 1, 0.01), (
             f"Sum of raw weights is {new_weights.sum()}, " f"but expected value is 1."
         )
-        self.weights = weight_diff(self.weights, new_weights, applied=True)
+        self.weights = weight_diff(
+            self.weights, new_weights, applied=True, threshold=self.weight_threshold
+        )
         assert np.isclose(self.weights.sum(), 1, 0.01), (
             f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
         )

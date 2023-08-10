@@ -22,10 +22,12 @@ stages:
 
 daily_job:
   stage: build
-  timeout: 5h
+  timeout: 6h
+  tags:
+    - saas-linux-medium-amd64
   script:
     - mkdir -p out/1D
-    - timeout 4.99h zx ./quick_comparison.mjs --rebalance 1D || echo "Process timed out"
+    - timeout 5.5h zx ./quick_comparison.mjs --rebalance 1D || echo "Process timed out"
   artifacts:
     paths:
       - out/1D/
