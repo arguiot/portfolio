@@ -19,6 +19,9 @@ job:
   script:
     - npm install
     - mkdir out
+    - mkdir out/daily
+    - mkdir out/weekly
+    - mkdir out/monthly
     - zx ./quick_comparison.mjs
   artifacts:
     paths:
