@@ -1,6 +1,6 @@
 from .GeneralOptimization import GeneralOptimization
 from pypfopt.hierarchical_portfolio import HRPOpt
-from portfolio_optimization.data_processing.expected_returns import expected_returns
+from ..data_processing.expected_returns import expected_returns
 import pandas as pd
 
 

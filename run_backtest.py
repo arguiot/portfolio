@@ -71,6 +71,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=HRPOptimization,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_markowitz = Portfolio(
@@ -78,6 +79,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Markowitz,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_bl = Portfolio(
@@ -86,6 +88,7 @@ def run_for_asset_class(
         optimiser=BlackLitterman,
         mcaps=mcaps.loc[start_date_portfolio],
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_parity = Portfolio(
@@ -93,6 +96,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RiskParity,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_fast_parity = Portfolio(
@@ -100,6 +104,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=FastRiskParity,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_default = Portfolio(
@@ -107,6 +112,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Heuristic,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_rtr = Portfolio(
@@ -114,6 +120,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RewardToRisk,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_vo = Portfolio(
@@ -121,6 +128,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=SimpleVolatility,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_vov = Portfolio(
@@ -128,6 +136,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=VolatilityOfVolatility,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_var = Portfolio(
@@ -135,6 +144,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=ValueAtRisk,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_rvar = Portfolio(
@@ -142,6 +152,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RewardToVaR,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     portfolio_combination = Portfolio(
@@ -149,6 +160,7 @@ def run_for_asset_class(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Combination,
         max_weight=max_weight,
+        weight_threshold=weight_threshold,
     )
 
     print(f"[REBALANCE FREQUENCY]: {rebalance_frequency}")

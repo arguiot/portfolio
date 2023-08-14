@@ -1,9 +1,9 @@
 import pandas as pd
 from multiprocessing import Pool
-from portfolio_optimization.data_collection.get_crypto_price_range import (
+from ..data_collection.get_crypto_price_range import (
     get_historical_prices_for_assets,
 )
-from portfolio_optimization.portfolio.Portfolio import Portfolio
+from ..portfolio.Portfolio import Portfolio
 
 from typing import Dict, List
 from pandas.core.frame import DataFrame, Series

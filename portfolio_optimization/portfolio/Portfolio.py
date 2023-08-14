@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-from portfolio_optimization.optimization.GeneralOptimization import GeneralOptimization
-from portfolio_optimization.optimization.heuristic import VolatilityOfVolatility
+from ..optimization.GeneralOptimization import GeneralOptimization
+from ..optimization.heuristic import VolatilityOfVolatility
 from typing import Type
 from .weight_diff import weight_diff
 
