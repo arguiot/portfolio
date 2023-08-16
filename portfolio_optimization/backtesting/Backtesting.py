@@ -28,6 +28,14 @@ class PortfolioPerformance:
         self.portfolio_holdings = portfolio_holdings
         self.portfolio_metrics = portfolio_metrics
 
+    def decompose_grouped_tokens(self, rosetta: pd.Series):
+        decomposed = pd.DataFrame()
+        for token in self.portfolio_holdings.index:
+            decomposed[token] = Portfolio.decompose_grouped_tokens(
+                self.portfolio_holdings[token], rosetta
+            )
+        return decomposed
+
 
 class Backtest:
     def __init__(

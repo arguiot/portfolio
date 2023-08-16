@@ -1,7 +1,6 @@
 from .GeneralOptimization import GeneralOptimization
 import numpy as np
 import pandas as pd
-from numpy.linalg import inv, pinv
 from scipy.optimize import minimize
 
 

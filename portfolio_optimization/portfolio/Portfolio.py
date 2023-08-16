@@ -179,3 +179,24 @@ class Portfolio:
 
         # Calculate new holdings
         self.holdings = self.holdings * (1 + apy)
+
+    def decompose_grouped_tokens(self, rosetta: pd.Series):
+        Portfolio.decompose_grouped_tokens(self.holdings, rosetta)
+
+    def decompose_grouped_tokens(current_holdings: pd.Series, rosetta: pd.Series):
+        """
+        Decomposes the holdings of the portfolio into single assets. This is useful when the portfolio contains LP Tokens representing token pairs.
+        """
+        # Iterate over the holdings. If a token is present in rosetta, then we decompose it.
+        for token in current_holdings.index:
+            if token in rosetta.index:
+                # Get the holdings of the token
+                token_holdings = current_holdings[token]
+                # Remove the token from the holdings
+                current_holdings = current_holdings.drop(token)
+                tokens = rosetta[token]
+                for asset in tokens:
+                    current_holdings[asset["name"]] = (
+                        asset["distribution"] * token_holdings
+                    )
+        return current_holdings
