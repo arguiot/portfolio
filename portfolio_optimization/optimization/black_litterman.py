@@ -10,7 +10,7 @@ import numpy as np
 
 
 class BlackLitterman(GeneralOptimization):
-    def __init__(self, df, mcaps, views=None, cov=None):
+    def __init__(self, df, mcaps, views=None, cov=None, weight_bounds=(0, 1)):
         """
         Initialize the BL class.
 
@@ -19,6 +19,7 @@ class BlackLitterman(GeneralOptimization):
         df : pandas.DataFrame
             A DataFrame of asset prices, where each column represents a different asset.
         """
+        self.weight_bounds = weight_bounds
         super().__init__(df, mcaps)
 
         if cov is None:
@@ -60,10 +61,7 @@ class BlackLitterman(GeneralOptimization):
         self.ef = EfficientFrontier(
             rets_bl,
             S_bl,
-            weight_bounds=(
-                0,
-                1,
-            ),  # The optimzer is not good at handling constraints, so we set the bounds to (0, 1) and use the `clean_weights` method to remove any assets with zero weight
+            weight_bounds=self.weight_bounds,  # The optimzer is not good at handling constraints, so we set the bounds to (0, 1) and use the `clean_weights` method to remove any assets with zero weight
             solver="ECOS_BB",
         )
         self.ef.add_objective(objective_functions.L2_reg)

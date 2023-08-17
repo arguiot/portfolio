@@ -5,7 +5,8 @@ from scipy.optimize import minimize
 
 
 class RiskParity(GeneralOptimization):
-    def __init__(self, df, mcaps=None):
+    def __init__(self, df, mcaps=None, weight_bounds=(0, 1)):
+        self.weight_bounds = weight_bounds
         super().__init__(df, mcaps)
 
     # risk budgeting optimization
@@ -38,7 +39,7 @@ class RiskParity(GeneralOptimization):
         return np.sum(x) - 1.0
 
     def long_only_constraint(self, x):
-        return x
+        return self.weight_bounds[1] - x  # TODO: Verify
 
     def get_weights(self):
         # 1 / N risk portfolio

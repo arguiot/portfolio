@@ -105,8 +105,9 @@ class Portfolio:
         assert np.isclose(new_weights.sum(), 1, 0.01), (
             f"Sum of raw weights is {new_weights.sum()}, " f"but expected value is 1."
         )
+        real_weights = self.get_current_weights(current_prices)
         self.weights = weight_diff(
-            self.weights, new_weights, applied=True, threshold=self.weight_threshold
+            real_weights, new_weights, applied=True, threshold=self.weight_threshold
         )
         assert np.isclose(self.weights.sum(), 1, 0.01), (
             f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
@@ -142,6 +143,17 @@ class Portfolio:
         if self.latest_optimiser is None:
             return None
         return self.latest_optimiser.get_metrics()
+
+    def get_current_weights(self, prices: pd.Series):
+        """
+        Returns the current weights of the portfolio based on the current holdings and prices.
+
+        Returns:
+            pd.Series: A pandas Series object representing the current weights of each asset in the portfolio.
+        """
+        if not hasattr(self, "holdings"):
+            return self.weights
+        return self.holdings * prices / self.value(prices)
 
     def value(self, prices: pd.Series):
         """
