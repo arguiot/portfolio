@@ -39,13 +39,17 @@ class RiskParity(GeneralOptimization):
         return np.sum(x) - 1.0
 
     def long_only_constraint(self, x):
-        return self.weight_bounds[1] - x  # TODO: Verify
+        return self.weight_bounds[1] - x
+
+    def short_only_constraint(self, x):
+        return x - self.weight_bounds[0]  # Ensuring weights are not less than
 
     def get_weights(self):
         # 1 / N risk portfolio
         x_t = [1 / self.df.shape[1]] * self.df.shape[1]
         cons = (
             {"type": "eq", "fun": self.total_weight_constraint},
+            {"type": "ineq", "fun": self.short_only_constraint},
             {"type": "ineq", "fun": self.long_only_constraint},
         )
 
