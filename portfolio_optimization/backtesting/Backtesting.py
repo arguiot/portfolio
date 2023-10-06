@@ -47,7 +47,10 @@ class Backtest:
         folder_path="./data/csv",
         data=None,
         mcaps=None,
+        asset_class=None,
+        progress_logger=None,
     ):
+        self.asset_class = asset_class
         self.price_data = (
             get_historical_prices_for_assets(
                 [
@@ -83,6 +86,10 @@ class Backtest:
             name: pd.Series(name="Metrics") for name in portfolios.keys()
         }
 
+        # For each portfolio, we add a task to the progress logger
+        for name in portfolios.keys():
+            progress_logger.add_task(name, 1) if progress_logger is not None else None
+
     def process_portfolio(
         self,
         name,
@@ -92,6 +99,7 @@ class Backtest:
         look_back_period,
         look_back_unit,
         yield_data,
+        progress_logger=None,
     ):
         for date in total_dates:
             prices = self.price_data.loc[date]
@@ -123,7 +131,8 @@ class Backtest:
                 self.portfolio_raw_composition[name].loc[date] = portfolio.raw_weights
                 self.portfolio_holdings[name].loc[date] = portfolio.holdings
                 self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
-        print(f"Finished processing {name}")
+        progress_logger.end_task(name) if progress_logger is not None else None
+
         return PortfolioPerformance(
             name,
             self.portfolio_values[name],
@@ -134,7 +143,13 @@ class Backtest:
             self.portfolio_metrics[name],
         )
 
-    def run_backtest(self, look_back_period=4, look_back_unit="M", yield_data=None):
+    def run_backtest(
+        self,
+        look_back_period=4,
+        look_back_unit="M",
+        yield_data=None,
+        progress_logger=None,
+    ):
         total_dates = pd.date_range(start=self.start_date, end=self.end_date, freq="D")
         rebalance_dates = pd.date_range(
             start=self.start_date, end=self.end_date, freq=self.rebalance_frequency
@@ -154,6 +169,7 @@ class Backtest:
                         look_back_period,
                         look_back_unit,
                         yield_data,
+                        progress_logger,
                     )
                     for name, portfolio in self.portfolios.items()
                 ],

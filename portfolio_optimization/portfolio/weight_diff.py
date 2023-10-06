@@ -18,6 +18,8 @@ def weight_diff(
         list or dict: A list of tuples containing the key, operation, and percentage change for each operation to perform.
                       Or, if applied=True, a dict of adjusted new_weights.
     """
+    if old_weights.sum() == 0:
+        return new_weights
     if applied is True and threshold == 0:
         return new_weights
     # Get the set of all keys

@@ -19,17 +19,17 @@ from portfolio_optimization.optimization.heuristic import (
     RewardToVaR,
     Combination,
 )
+from portfolio_optimization.utils import ProgressLogger
 
 from portfolio_optimization.portfolio.Portfolio import Portfolio
 from portfolio_optimization.backtesting.Backtesting import Backtest
 from dateutil.relativedelta import relativedelta
 
 
-def run_for_asset_class(
+def create_portfolios(
     asset_list,
     asset_class="high_risk_tickers",
-    show_progress=False,
-    rebalance_frequency="1D",
+    progress_logger=None,
 ):
     _df = get_historical_prices_for_assets(
         asset_list[asset_class],
@@ -185,8 +185,18 @@ def run_for_asset_class(
         rebalance_frequency=rebalance_frequency,
         data=df,
         mcaps=mcaps,
+        asset_class=asset_class,
+        progress_logger=progress_logger,
     )
 
+    return backtest
+
+
+def run_for_asset_class(
+    backtest: Backtest,
+    rebalance_frequency="1D",
+    progress_logger=None,
+):
     yield_data = pd.Series()
     for asset in asset_list[asset_class]:
         if asset_class == "high_risk_tickers":
@@ -196,14 +206,12 @@ def run_for_asset_class(
         elif asset_class == "low_risk_tickers":
             yield_data[asset] = 0.06
 
-    if show_progress:
-        print(f"[PROGRESS]: 10%")
-
     perfs = backtest.run_backtest(
-        look_back_period=120, look_back_unit="D", yield_data=yield_data
+        look_back_period=120,
+        look_back_unit="D",
+        yield_data=yield_data,
+        progress_logger=progress_logger,
     )
-    if show_progress:
-        print(f"[PROGRESS]: 90%")
 
     # Check if the directory exists, if not, create it
     if not os.path.exists(f"./out/{rebalance_frequency}/"):
@@ -213,14 +221,15 @@ def run_for_asset_class(
         perfs, f"./out/{rebalance_frequency}/", f"backtest_results_{asset_class}.xlsx"
     )
 
-    if show_progress:
-        print(f"[PROGRESS]: 100%")
-
 
 if __name__ == "__main__":
     import warnings
 
     warnings.filterwarnings("ignore")
+
+    # Instantiate the `ProgressLogger` object
+    progress_logger = ProgressLogger()
+
     asset_list = get_tickers()
     # Get `--rebalance <frequency>` flag
     if "--rebalance" in sys.argv:
@@ -230,23 +239,41 @@ if __name__ == "__main__":
     # If the CLI is called with the `--class <asset_class>` flag, run the backtest for the specified asset class
     if "--class" in sys.argv:
         asset_class = sys.argv[sys.argv.index("--class") + 1]
-        run_for_asset_class(
+        backtest = create_portfolios(
             asset_list,
             asset_class=asset_class,
-            show_progress=True,
+            progress_logger=progress_logger.context(asset_class),
+        )
+        run_for_asset_class(
+            backtest=backtest,
             rebalance_frequency=rebalance_frequency,
+            progress_logger=progress_logger,
         )
         sys.exit()
     else:
         # Otherwise, run the backtest for all asset classes
         asset_classes = ["high_risk_tickers", "medium_risk_tickers", "low_risk_tickers"]
+
+        backtests = []
+        loggers = []
+
         for asset_class in asset_classes:
-            run_for_asset_class(
+            logger = progress_logger.context(asset_class)
+
+            backtest = create_portfolios(
                 asset_list,
                 asset_class=asset_class,
-                show_progress=True,
-                rebalance_frequency=rebalance_frequency,
+                progress_logger=logger,
             )
-            # Print progress
-            index = asset_classes.index(asset_class) + 1
-            print(f"[PROGRESS]: {index * 100 / len(asset_classes)}%")
+            backtests.append(backtest)
+            loggers.append(logger)
+
+        for backtest in backtests:
+            asset_class = backtest.asset_class
+            logger = loggers[backtests.index(backtest)]
+            run_for_asset_class(
+                backtest=backtest,
+                rebalance_frequency=rebalance_frequency,
+                progress_logger=logger,
+            )
+    progress_logger.delete()

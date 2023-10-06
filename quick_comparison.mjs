@@ -1,12 +1,11 @@
-#!/usr/bin/env zx
+#!/usr/bin/env bun
 
 import { spawn } from 'child_process';
 import { runAppleScript } from 'run-applescript';
 import fs from 'fs';
+import path from 'path';
 import os from 'os';
 const cliProgress = require('cli-progress');
-
-$.verbose = false;
 
 // If `--rebalance <period>` is specified, pass it to the Python script
 const rebalanceIndex = process.argv.indexOf('--rebalance');
@@ -16,6 +15,34 @@ const runBacktestWithProgressBar = () => new Promise((resolve, reject) => {
   // Create a new progress bar instance
   const progressBar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
   progressBar.start(100, 0); // 100% is the max
+
+  const shared_file_path = './portfolio_progress';
+  // If the file doesn't exist, create it
+  if (!fs.existsSync(shared_file_path)) {
+    fs.writeFileSync(shared_file_path, Buffer.alloc(8));
+  }
+
+  const mmap = Bun.mmap(shared_file_path, { shared: true });
+  const log_progress = async () => {
+    
+    while (mmap[8]) { // wait until no other process is reading/writing
+      // sleep for 10 milliseconds
+      await Bun.sleep(10);
+    }
+    const buffer = new Uint8Array(mmap);
+    const dataView = new DataView(buffer.buffer);
+
+    // First 4 bytes represents total step count (integer)
+    const totalSteps = dataView.getUint32(0, true); // get 4 bytes as UInt32 little-endian
+    // Next 4 bytes represents current step (integer)
+    const currentStep = dataView.getUint32(4, true); // get 4 bytes as UInt32 little-endian
+
+    // Update the progress bar
+    progressBar.update(currentStep);
+    progressBar.setTotal(totalSteps);
+  }
+
+
   // Clear the log file
   fs.writeFile('out/run_backtest.log', '', (err) => {
     if (err) throw err; // Optional; depends on whether you want to handle errors here
@@ -34,12 +61,7 @@ const runBacktestWithProgressBar = () => new Promise((resolve, reject) => {
   const pythonProcess = spawn('python', args);
 
   pythonProcess.stdout.on('data', (data) => {
-    // Extract the percentage from the string, assuming the format is always [PROGRESS]: X%
-    const progressMatch = String(data).match(/\[PROGRESS\]: (\d+)%/);
-    if (progressMatch) {
-      const progressPercentage = Number(progressMatch[1]);
-      progressBar.update(progressPercentage);
-    }
+    log_progress();
     // Write data to file without blocking
     fs.appendFile('out/run_backtest.log', data, (err) => {
       if (err) throw err; // Optional; depends on whether you want to handle errors here
@@ -66,7 +88,7 @@ const runBacktestWithProgressBar = () => new Promise((resolve, reject) => {
 // 1. Force Quit Excel
 try {
   if (os.platform() === 'darwin') {  // Check if it is macOS
-    await $`killall "Microsoft Excel"`;
+    spawn('killall', ['Microsoft Excel']);
   }
 } catch { }
 
@@ -84,17 +106,37 @@ if (!process.argv.includes('--skip-backtest')) {
 }
 
 // 3. Open all .xlsx files and arrange windows using AppleScript
-let filePaths = [];
+function getSortedFilePaths(dirPath) {
+  let filePaths = [];
 
-let globResult = (await $`find ./out/${rebalancePeriod} -name "*.xlsx" -type f -print0 | xargs -0 ls -tu`).stdout.split('\n');
-// Reverse the order of files so that the most recent one is opened first
-globResult = globResult.reverse().filter((filePath) => !filePath.includes('~$')); // Remove temporary files
-console.log(`📂 Found ${globResult.length} files`);
-for (let filePath of globResult) {
+  // Fetch all files in the directory
+  const files = fs.readdirSync(dirPath);
+
+  // Build full file paths and filter out
+  // temporary lock files created by Excel
+  for (const file of files) {
+    const filePath = path.join(dirPath, file);
+    if (path.extname(filePath) === '.xlsx' && !filePath.includes('~$')) {
+      filePaths.push(filePath);
+    }
+  }
+
+  // Sort the file paths by modified time
+  filePaths.sort((a, b) => {
+    return fs.statSync(a).mtime.getTime() -
+      fs.statSync(b).mtime.getTime();
+  });
+
+  return filePaths;
+}
+
+let filePaths = getSortedFilePaths(`./out/${rebalancePeriod}`);
+
+console.log(`📂 Found ${filePaths.length} files`);
+for (let filePath of filePaths) {
   if (filePath) {
-    filePaths.push(filePath);
     if (os.platform() === 'darwin') {  // Check if it is macOS
-      await $`open "${filePath}"`;
+      spawn('open', ['-a', 'Microsoft Excel', filePath]);
     }
   }
 }
