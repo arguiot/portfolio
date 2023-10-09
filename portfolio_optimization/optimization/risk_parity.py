@@ -1,8 +1,8 @@
 from enum import Enum
 from .GeneralOptimization import GeneralOptimization
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
-from scipy.optimize import minimize
 from pypfopt.risk_models import CovarianceShrinkage, sample_cov
 import riskparityportfolio as rp
 
@@ -23,6 +23,18 @@ class RiskParity(GeneralOptimization):
         else:
             self.cov_matrix = cov
 
+        # Contrainsts
+        self.tau: float | None = None
+        self.gamma: float = 0.9
+        self.zeta: float = 1e-7
+        self.funtol: float = 0.000001
+        self.wtol: float = 0.000001
+        self.maxiter: int = 500
+        self.Cmat: NDArray[np.float64] | None = None
+        self.cvec: NDArray[np.float64] | None = None
+        self.Dmat: NDArray[np.float64] | None = None
+        self.dvec: NDArray[np.float64] | None = None
+
     def get_weights(self):
         # Calculate budget, which is a vector of equal weights
         budget = np.ones(self.cov_matrix.shape[0]) / self.cov_matrix.shape[0]
@@ -32,7 +44,18 @@ class RiskParity(GeneralOptimization):
             covariance=self.cov_matrix,
             budget=budget,
         )
-        pf.design()
+        pf.design(
+            tau=self.tau,
+            gamma=self.gamma,
+            zeta=self.zeta,
+            funtol=self.funtol,
+            wtol=self.wtol,
+            maxiter=self.maxiter,
+            Cmat=self.Cmat,
+            cvec=self.cvec,
+            Dmat=self.Dmat,
+            dvec=self.dvec,
+        )
         weights = pd.Series(pf.weights, index=self.df.columns)
         return weights
 
