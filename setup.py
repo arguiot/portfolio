@@ -120,7 +120,6 @@ class BuildExt(build_ext):
         # run standard build procedure
         build_ext.build_extensions(self)
 
-
 setup(
     name="portfolio_optimization",
     version=__version__,
@@ -133,8 +132,10 @@ setup(
     packages=["portfolio_optimization"],
     long_description="",
     ext_modules=ext_modules,
-    install_requires=["pybind11>=2.4", "numpy", "jaxlib", "jax", "quadprog", "tqdm"],
-    setup_requires=["pybind11>=2.4", "numpy", "jaxlib", "jax", "quadprog", "tqdm"],
+    install_requires=["pybind11>=2.4", "numpy", "jaxlib", "jax", 
+                      "tqdm"],
+    setup_requires=["pybind11>=2.4", "numpy", "jaxlib", "jax", 
+                    "tqdm"],
     cmdclass={"build_ext": BuildExt},
     classifiers=[
         "Development Status :: 3 - Alpha",
