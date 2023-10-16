@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import pandas as pd
 
 
 class GeneralOptimization(ABC):
@@ -6,12 +7,24 @@ class GeneralOptimization(ABC):
     Abstract base class for portfolio optimization. Subclasses should implement the `optimize`, `clean_weights`, and `get_weights` methods.
     """
 
-    def __init__(self, df, mcaps=None):
+    def __init__(self, df: pd.DataFrame, mcaps=None):
         self.df = df
         self.mcaps = mcaps
 
+    def apply_kwargs(self, kwargs):
+        """
+        Apply the kwargs to the optimization object.
+
+        Args:
+        -----
+        kwargs : dict
+            A dictionary containing the kwargs to be applied to the optimization object.
+        """
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
     @abstractmethod
-    def get_weights(self):
+    def get_weights(self) -> pd.Series:
         """
         Get the optimized portfolio weights.
 

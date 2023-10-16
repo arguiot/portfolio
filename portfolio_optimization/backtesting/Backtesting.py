@@ -1,4 +1,5 @@
 import pandas as pd
+import traceback
 from multiprocessing import Pool
 from ..data_collection.get_crypto_price_range import (
     get_historical_prices_for_assets,
@@ -122,9 +123,10 @@ class Backtest:
                         mcaps,
                     )
                 except Exception as e:
-                    print(e)
+                    print(str(e))
+                    traceback.print_exc()
                     print(
-                        f"Skipping rebalance on {date.strftime('%Y-%m-%d')} due to insufficient data."
+                        f"Skipping rebalance for {name} on {date.strftime('%Y-%m-%d')} due to insufficient data."
                     )
 
                 self.portfolio_compositions[name].loc[date] = portfolio.weights

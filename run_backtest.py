@@ -47,13 +47,31 @@ def create_portfolios(
 
     start_date_portfolio = df.index[0] + relativedelta(months=5)
 
-    max_weight = 1
+    # Specify per asset as well
+    max_weight = {"*": 1.0}
     if asset_class == "high_risk_tickers":
-        max_weight = 0.15
+        max_weight = {"btc": 0.1, "*": 0.15}
     elif asset_class == "medium_risk_tickers":
         max_weight = 0.05
     elif asset_class == "low_risk_tickers":
         max_weight = 0.3
+
+    min_weight = 0
+    # min_weight = { 'btc': 0.05, '*': 0.01 }
+    if asset_class == "high_risk_tickers":
+        min_weight = {"sol": 0.05, "*": 0.01}
+    elif asset_class == "medium_risk_tickers":
+        min_weight = 0.01
+    elif asset_class == "low_risk_tickers":
+        min_weight = 0.01
+
+    budget = {}
+    if asset_class == "high_risk_tickers":
+        budget = {"uni": 1.2}  # Extra 20% for UNI
+    elif asset_class == "medium_risk_tickers":
+        budget = {}
+    elif asset_class == "low_risk_tickers":
+        budget = {}
 
     weight_threshold = 0.01
 
@@ -71,6 +89,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=HRPOptimization,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -79,6 +98,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Markowitz,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -88,6 +108,7 @@ def create_portfolios(
         optimiser=BlackLitterman,
         mcaps=mcaps.loc[start_date_portfolio],
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -96,7 +117,11 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RiskParity,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
+        budget=budget,
+        lambda_var=0.1,
+        lambda_u=0.1,
     )
 
     portfolio_fast_parity = Portfolio(
@@ -104,6 +129,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=FastRiskParity,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -112,6 +138,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Heuristic,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -120,6 +147,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RewardToRisk,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -136,6 +164,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=VolatilityOfVolatility,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -144,6 +173,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=ValueAtRisk,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -152,6 +182,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=RewardToVaR,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 
@@ -160,6 +191,7 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=Combination,
         max_weight=max_weight,
+        min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
 

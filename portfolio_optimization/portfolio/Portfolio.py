@@ -4,6 +4,7 @@ from ..optimization.GeneralOptimization import GeneralOptimization
 from ..optimization.heuristic import VolatilityOfVolatility
 from typing import Type
 from .weight_diff import weight_diff
+from typing import Dict
 
 
 class Portfolio:
@@ -12,9 +13,11 @@ class Portfolio:
         base_value: float,
         initial_prices: pd.DataFrame,
         optimiser: Type[GeneralOptimization],
-        mcaps: pd.Series | pd.DataFrame = None,
-        max_weight: float = 1.0,
+        mcaps: pd.Series | pd.DataFrame | None = None,
+        max_weight: float | Dict[str, float] = 1.0,
+        min_weight: float | Dict[str, float] = 0.0,
         weight_threshold: float = 0.01,
+        **kwargs,  # For additional parameters for the optimiser
     ):
         self.optimiser = optimiser
         self.weights = pd.Series()
@@ -22,7 +25,10 @@ class Portfolio:
         initial_prices = initial_prices.dropna(axis=1)
         current_prices = initial_prices.iloc[-1]
         self.max_weight = max_weight
+        self.min_weight = min_weight
         self.weight_threshold = weight_threshold
+        self.kwargs = kwargs
+        self.latest_apy: pd.Series | None = None
         # Remove keys from mcaps that are not in initial_prices columns
         if mcaps is not None:
             mcaps = mcaps.reindex(initial_prices.columns)
@@ -56,27 +62,51 @@ class Portfolio:
         df: pd.DataFrame,
         current_prices: pd.Series,
         base_value: float,
-        mcaps: pd.Series = None,
+        mcaps: pd.Series | None = None,
     ):
         df = df.dropna(axis=1)
+
+        # Check if `max_weight` and `min_weight` are dictionary or not and set to dictionary
+        if isinstance(self.max_weight, float):
+            max_weight_dict = {key: self.max_weight for key in df.columns}
+            max_weight_dict["*"] = self.max_weight  # Using '*' for default value
+            self.max_weight = max_weight_dict
+        if isinstance(self.min_weight, float):
+            min_weight_dict = {key: self.min_weight for key in df.columns}
+            min_weight_dict["*"] = self.min_weight  # Using '*' for default value
+            self.min_weight = min_weight_dict
+
         self.latest_optimiser = self.optimiser(df, mcaps)
-        # If optimizer has `weight_bounds` attribute, set it to `self.max_weight`
+        self.latest_optimiser.apply_kwargs(self.kwargs)
+        setattr(self.latest_optimiser, "latest_apy", self.latest_apy)
+
+        # If optimizer has `weight_bounds` attribute, provide max_weight and min_weight for each asset
         if hasattr(self.latest_optimiser, "weight_bounds"):
-            self.latest_optimiser.weight_bounds = (0, self.max_weight)
+            weight_bounds = (self.min_weight["*"], self.max_weight["*"])
+            self.latest_optimiser.weight_bounds = weight_bounds
+        elif hasattr(self.latest_optimiser, "asset_weight_bounds"):
+            asset_weight_bounds = {}
+            for asset in df.columns:
+                asset_weight_bounds[asset] = (
+                    self.min_weight.get(asset, self.min_weight["*"]),
+                    self.max_weight.get(asset, self.max_weight["*"]),
+                )
+
+            self.latest_optimiser.asset_weight_bounds = asset_weight_bounds
 
         new_weights = self.latest_optimiser.get_weights()
         self.raw_weights = new_weights.copy()
 
         # Check and handle weights in case does not meet the 'max_weight'
-        while new_weights.max() > self.max_weight:
+        while new_weights.max() > self.max_weight["*"]:
             # Get the asset with maximum weight
             max_weight_asset = new_weights.idxmax()
 
             # Remove the weight not equal to self.max_weight
-            new_weights = new_weights[new_weights == self.max_weight]
+            new_weights = new_weights[new_weights == self.max_weight["*"]]
 
             # Set its weight to self.max_weight
-            new_weights[max_weight_asset] = self.max_weight
+            new_weights[max_weight_asset] = self.max_weight["*"]
 
             # Drop the asset in new_weights from df
             df_rest = df.drop(new_weights.index, axis=1)
@@ -92,6 +122,8 @@ class Portfolio:
 
             # Re-run the optimiser on the rest of the assets
             local_optimiser = self.optimiser(df_rest, mcaps_rest)
+            local_optimiser.apply_kwargs(self.kwargs)
+            setattr(local_optimiser, "latest_apy", self.latest_apy)
             new_weights_rest = local_optimiser.get_weights()
 
             # Normalize the weight so that the sum of weights is 1. We look at the sum of `new_weights`, and we make sure that the sum of `new_weights_rest` is 1 - sum of `new_weights`
@@ -106,9 +138,9 @@ class Portfolio:
             f"Sum of raw weights is {new_weights.sum()}, " f"but expected value is 1."
         )
         real_weights = self.get_current_weights(current_prices)
-        self.weights = weight_diff(
-            real_weights, new_weights, applied=True, threshold=self.weight_threshold
-        )
+        self.weights = new_weights  # weight_diff(
+        #    real_weights, new_weights, applied=True, threshold=self.weight_threshold
+        # )
         assert np.isclose(self.weights.sum(), 1, 0.01), (
             f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
         )
@@ -189,6 +221,7 @@ class Portfolio:
         # If yield is negative, set to 0
         apy[apy < 0] = 0
 
+        self.latest_apy = apy
         # Calculate new holdings
         self.holdings = self.holdings * (1 + apy)
 
