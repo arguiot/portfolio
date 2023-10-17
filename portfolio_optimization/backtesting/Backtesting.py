@@ -45,6 +45,7 @@ class Backtest:
         start_date,
         end_date,
         rebalance_frequency="W",
+        adjust_holdings=True,
         folder_path="./data/csv",
         data=None,
         mcaps=None,
@@ -68,6 +69,7 @@ class Backtest:
         self.start_date = pd.to_datetime(start_date)
         self.end_date = pd.to_datetime(end_date)
         self.rebalance_frequency = rebalance_frequency
+        self.adjust_holdings = adjust_holdings
         self.portfolios = portfolios
         self.portfolio_values = {
             name: pd.DataFrame(index=self.price_data.index, columns=["Portfolio Value"])
@@ -94,7 +96,7 @@ class Backtest:
     def process_portfolio(
         self,
         name,
-        portfolio,
+        portfolio: Portfolio,
         total_dates,
         rebalance_dates,
         look_back_period,
@@ -110,6 +112,8 @@ class Backtest:
             self.portfolio_values[name].loc[date, "Portfolio Value"] = portfolio.value(
                 prices
             )
+            if self.adjust_holdings:
+                portfolio.match_weights(prices)
             if date in rebalance_dates:
                 start = date - pd.to_timedelta(look_back_period, unit=look_back_unit)
                 historical_data = self.price_data.loc[start:date]
@@ -131,8 +135,8 @@ class Backtest:
 
                 self.portfolio_compositions[name].loc[date] = portfolio.weights
                 self.portfolio_raw_composition[name].loc[date] = portfolio.raw_weights
-                self.portfolio_holdings[name].loc[date] = portfolio.holdings
                 self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
+            self.portfolio_holdings[name].loc[date] = portfolio.holdings
         progress_logger.end_task(name) if progress_logger is not None else None
 
         return PortfolioPerformance(

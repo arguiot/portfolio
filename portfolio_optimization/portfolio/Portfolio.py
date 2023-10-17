@@ -187,6 +187,18 @@ class Portfolio:
             return self.weights
         return self.holdings * prices / self.value(prices)
 
+    def match_weights(self, prices: pd.Series):
+        """
+        Rebalances the portfolio to match the current weights. It adjusts the holdings of each asset to match the current weights, based on the current price and value of the portfolio.
+
+        Returns:
+            pd.Series: A pandas Series object representing the current weights of each asset in the portfolio.
+        """
+        if not hasattr(self, "holdings"):
+            return self.weights
+        self.holdings = self.weights * self.value(prices) / prices
+        return self.weights
+
     def value(self, prices: pd.Series):
         """
         Calculates the current value of the portfolio given a set of asset prices.

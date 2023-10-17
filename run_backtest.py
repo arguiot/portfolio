@@ -33,7 +33,7 @@ def create_portfolios(
 ):
     _df = get_historical_prices_for_assets(
         asset_list[asset_class],
-        time_range=timedelta(days=365 * 3),
+        time_range=timedelta(days=365 * 1 + 120),  # 1 years
         interested_columns=["ReferenceRate", "CapMrktEstUSD"],
     )
 
@@ -45,7 +45,7 @@ def create_portfolios(
     mcaps.columns = mcaps.columns.str.replace("_CapMrktEstUSD", "")
     mcaps.replace(np.nan, 0, inplace=True)
 
-    start_date_portfolio = df.index[0] + relativedelta(months=5)
+    start_date_portfolio = df.index[0] + relativedelta(days=120)
 
     # Specify per asset as well
     max_weight = {"*": 1.0}
@@ -215,6 +215,7 @@ def create_portfolios(
         start_date=start_date_portfolio,
         end_date=df.index[-1],
         rebalance_frequency=rebalance_frequency,
+        adjust_holdings=True,
         data=df,
         mcaps=mcaps,
         asset_class=asset_class,
