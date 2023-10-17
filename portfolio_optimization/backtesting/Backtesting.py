@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import string
 import traceback
 from multiprocessing import Pool
 from ..data_collection.get_crypto_price_range import (
@@ -183,6 +185,59 @@ class Backtest:
 
         return portfolio_performances
 
+    def portfolio_analysis(
+        self, df: pd.DataFrame | pd.Series, name, risk_free_rate_pos=11, is_asset=False
+    ):
+        prices = df[name].dropna() if is_asset else df.dropna()
+        daily_return = prices.pct_change()
+
+        total_return = (prices.iloc[-1] / prices.iloc[0]) - 1
+
+        average_daily_return = daily_return.mean()
+        average_monthly_return = ((1 + average_daily_return) ** 30) - 1
+        apy = ((1 + average_daily_return) ** 365) - 1
+        cagr = ((prices.iloc[-1] / prices.iloc[0]) ** (1 / (len(prices) / 365))) - 1
+
+        letter_index = (
+            string.ascii_uppercase[df.columns.get_loc(name)] if is_asset is True else 0
+        )
+        key = (
+            "'" + name + "'!C:C"
+            if not is_asset
+            else f"'Price Data'!{letter_index}:{letter_index}"
+        )
+
+        sharpe_ratio_formula = (
+            f"=(AVERAGE({key})/STDEV({key})-$B${risk_free_rate_pos})*SQRT(365)"
+        )
+
+        volatility = daily_return.std()
+        annualized_volatility = volatility * np.sqrt(365)
+
+        # Maximum drawdown
+        running_max = np.maximum.accumulate(prices)
+        running_max[running_max < 1] = 1
+
+        drawdown = prices / running_max - 1.0
+        max_dd = drawdown.min()
+
+        calmar_ratio = f"={cagr}-B{risk_free_rate_pos}/{max_dd}"
+
+        return daily_return, pd.Series(
+            {
+                "Total Return": total_return,
+                "Average Daily Return": average_daily_return,
+                "Average Monthly Return": average_monthly_return,
+                "Average Annual Return": apy,
+                "CAGR": cagr,
+                "Sharpe Ratio": sharpe_ratio_formula,
+                "Daily Volatility": volatility,
+                "Annualized Volatility": annualized_volatility,
+                "Max Drawdown": max_dd,
+                "Calmar Ratio": calmar_ratio,
+            }
+        )
+
     def export_results(
         self,
         performances: List[PortfolioPerformance],
@@ -195,6 +250,13 @@ class Backtest:
         # Create a Pandas Excel writer using XlsxWriter as the engine.
         writer = pd.ExcelWriter(f"{folder_path}/{file_name}", engine="xlsxwriter")
 
+        # Copy price_data and crop it to the start and end dates of the backtest
+        price_data = self.price_data.copy()
+        price_data = price_data.loc[self.start_date : self.end_date]
+
+        price_data.to_excel(writer, sheet_name="Price Data", index=True)
+        writer.sheets["Price Data"].hide()
+
         overview_df = pd.DataFrame(
             index=[
                 "Total Return",
@@ -203,7 +265,10 @@ class Backtest:
                 "Average Annual Return",
                 "CAGR",
                 "Sharpe Ratio",
-                "Volatility",
+                "Daily Volatility",
+                "Annualized Volatility",
+                "Max Drawdown",
+                "Calmar Ratio",
             ]
         )
 
@@ -217,38 +282,12 @@ class Backtest:
             value = performance.portfolio_value.dropna()
             # Calculate the metrics
             value = performance.portfolio_value.dropna()
-            value["Daily Return"] = value["Portfolio Value"].pct_change()
-
-            total_return = (
-                value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0] - 1
-            )
-
-            average_daily_return = value["Daily Return"].mean()
-            average_monthly_return = ((1 + average_daily_return) ** 30) - 1
-            apy = ((1 + average_daily_return) ** 365) - 1
-            cagr = (
-                (value["Portfolio Value"].iloc[-1] / value["Portfolio Value"].iloc[0])
-                ** (1 / (len(value) / 365))
-            ) - 1
-            # sharpe_ratio = (
-            #     value["Daily Return"].mean() / value["Daily Return"].std()
-            # ) * np.sqrt(365)
-            sharpe_ratio_formula = f"=(AVERAGE('{performance.name}'!C:C)/STDEV('{performance.name}'!C:C)-$B$11)*SQRT(365)"
-
-            volatility = value["Daily Return"].std()
-
             # Add to dataframe
-            overview_df[performance.name] = pd.Series(
-                {
-                    "Total Return": total_return,
-                    "Average Daily Return": average_daily_return,
-                    "Average Monthly Return": average_monthly_return,
-                    "Average Annual Return": apy,
-                    "CAGR": cagr,
-                    "Sharpe Ratio": sharpe_ratio_formula,
-                    "Volatility": volatility,
-                }
+            risk_free_rate_pos = overview_df.shape[0] + 4
+            daily_return, overview_df[performance.name] = self.portfolio_analysis(
+                value["Portfolio Value"], performance.name, risk_free_rate_pos
             )
+            value["Daily Return"] = daily_return
             value.to_excel(writer, sheet_name=performance.name, startrow=3)
 
             # Write the portfolio name at the top of the sheet
@@ -256,17 +295,6 @@ class Backtest:
             sheet.write(0, 0, performance.name)
 
             sheet.write(2, 0, "Portfolio Value")
-            # if performance.portfolio_metrics is not None:
-            #     performance.portfolio_metrics = performance.portfolio_metrics.dropna()
-            #     metrics = performance.portfolio_metrics.tolist()
-
-            #     # ensuring that metrics is not an empty list
-            #     if metrics:
-            #         metrics_df = pd.DataFrame(metrics)
-            #         metrics_df.index = performance.portfolio_metrics.index
-            #         metrics_df.to_excel(
-            #             writer, sheet_name=performance.name, startrow=3, startcol=5
-            #         )
 
             # Convert each item of the series to a DataFrame and then to excel
             sheet.write(2, 5, "Portfolio Weights")
@@ -300,6 +328,29 @@ class Backtest:
             end_col = performance.portfolio_value.shape[1] - 1
 
         overview_df.to_excel(writer, sheet_name="Overview", index=True)
+
+        # Erease the content of `overview_df` and redo for assets
+        overview_df = pd.DataFrame()
+
+        for asset in self.price_data.columns:
+            try:
+                overview_df[asset] = self.portfolio_analysis(
+                    self.price_data, asset, risk_free_rate_pos, is_asset=True
+                )[1]
+            except Exception as e:
+                print(str(e))
+                traceback.print_exc()
+                print(
+                    f"Skipping analysis for {asset} due to insufficient data. Make sure the price data is complete."
+                )
+
+        overview_df.to_excel(
+            writer,
+            sheet_name="Overview",
+            index=True,
+            startrow=overview_df.shape[0] + 23,
+        )
+
         # Set the "Overview" sheet as the active sheet.
         writer.sheets["Overview"].activate()
         writer.sheets["Overview"].set_first_sheet()
@@ -307,11 +358,11 @@ class Backtest:
         # Create a dropdown list selector for the charts
         chart_sheet = writer.sheets["Overview"]
 
-        chart_sheet.write(10, 0, "Risk Free Rate")
-        chart_sheet.write(10, 1, 0.02)
-        chart_sheet.write(12, 1, performances[0].name)
+        chart_sheet.write(overview_df.shape[0] + 3, 0, "Risk Free Rate")
+        chart_sheet.write(overview_df.shape[0] + 3, 1, 0.02)
+        chart_sheet.write(overview_df.shape[0] + 5, 1, performances[0].name)
         chart_sheet.data_validation(
-            "B13",
+            f"B{overview_df.shape[0] + 6}",
             {
                 "validate": "list",
                 "source": [portfolio.name for portfolio in performances],
@@ -325,7 +376,7 @@ class Backtest:
         # Use =INDIRECT("'"&INDEX(Overview!B1:H1,1,Overview!B10)&"'!A5:"&"C"&COUNTA(INDIRECT("'"&INDEX(Overview!B1:H1,1,Overview!B10)&"'!A:A")))
         writer.sheets["Chart Data"].write_dynamic_array_formula(
             "A1:A1",
-            '=INDIRECT("\'"&Overview!B13&"\'!A5:"&"C"&COUNTA(INDIRECT("\'"&Overview!B13&"\'!A:A")))',
+            f'=INDIRECT("\'"&Overview!B{overview_df.shape[0] + 6}&"\'!A5:"&"C"&COUNTA(INDIRECT("\'"&Overview!B{overview_df.shape[0] + 6}&"\'!A:A")))',
         )
 
         # Format A column as dates
@@ -346,6 +397,6 @@ class Backtest:
         )
 
         # Insert the chart into the sheet
-        chart_sheet.insert_chart("B15", chart)
+        chart_sheet.insert_chart(f"B{overview_df.shape[0] + 8}", chart)
         # Close the Pandas Excel writer and output the Excel file.
         writer.close()
