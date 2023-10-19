@@ -1,302 +1,792 @@
 import numpy as np
+import pandas as pd
+from numpy.typing import NDArray
 
 
-def currentAmountAsset(_amountAsset, _priceAsset):
-    return _amountAsset * _priceAsset
+def currentAmountAsset(amountAsset: NDArray, priceAsset: NDArray) -> NDArray:
+    """
+    Function to calculate the current amount of asset.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+
+    Returns:
+    array
+        The current amount of asset.
+    """
+    return amountAsset * priceAsset
 
 
-def currentTotalAmountAsset(_amountAsset, _priceAsset):
-    return np.sum(_amountAsset * _priceAsset)
+def currentTotalAmountAsset(
+    amountAsset: NDArray[np.float64], priceAsset: NDArray[np.float64]
+) -> float:
+    """
+    Function to calculate the current total amount of asset.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+
+    Returns:
+    float
+        The current total amount of asset.
+    """
+    return float(np.sum(amountAsset * priceAsset))
 
 
-def depositINDAsset(_TBDAmount):
-    return 1 if _TBDAmount >= 0 else 0
+def depositINDAsset(TBDAmount: float) -> int:
+    """
+    Function to calculate the deposit indicator of asset.
+
+    Parameters:
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    int
+        The deposit indicator of asset.
+    """
+    return 1 if TBDAmount >= 0 else 0
 
 
-def withdrawINDAsset(_TBDAmount):
-    return 1 - depositINDAsset(_TBDAmount)
+def withdrawINDAsset(TBDAmount: float) -> int:
+    """
+    Function to calculate the withdrawal indicator of asset.
+
+    Parameters:
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    int
+        The withdrawal indicator of asset.
+    """
+    return 1 - depositINDAsset(TBDAmount)
 
 
-def newAmountAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
+def newAmountAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the new amount of asset.
 
-    _newAmount = np.zeros((nbAsset, 3))
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
 
-    _currentTotalAmount = currentTotalAmountAsset(_amountAsset, _priceAsset)
+    Returns:
+    array
+        The new amount of asset.
+    """
+    nbAsset = np.shape(amountAsset)[0]
 
-    _newAmount[:, 0] = np.minimum(
-        (_currentTotalAmount + _TBDAmount) * _weightAssets[:, 0],
-        (_currentTotalAmount + _TBDAmount) * _weightAssets[:, 2])
+    newAmount = np.zeros((nbAsset, 3))
 
-    _newAmount[:, 1] = (_currentTotalAmount + _TBDAmount) * _weightAssets[:, 1]
-    _newAmount[:, 2] = np.maximum(
-        (_currentTotalAmount + _TBDAmount) * _weightAssets[:, 0],
-        (_currentTotalAmount + _TBDAmount) * _weightAssets[:, 2])
-    return _newAmount
+    currentTotalAmount = currentTotalAmountAsset(amountAsset, priceAsset)
 
+    newAmount[:, 0] = np.minimum(
+        (currentTotalAmount + TBDAmount) * weightAssets[:, 0],
+        (currentTotalAmount + TBDAmount) * weightAssets[:, 2],
+    )
 
-def minMaxCurrentDifAsset(_amountAsset, _priceAsset, _weightAssets,
-                          _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
-    _minMaxCurrentDif = np.zeros(nbAsset)
-
-    _depositIND = depositINDAsset(_TBDAmount)
-
-    _withdrawIND = withdrawINDAsset(_TBDAmount)
-
-    _newAmountMinAsset = newAmountAsset(_amountAsset, _priceAsset,
-                                        _weightAssets, _TBDAmount)[:, 0]
-
-    _newAmountMaxAsset = newAmountAsset(_amountAsset, _priceAsset,
-                                        _weightAssets, _TBDAmount)[:, 2]
-
-    _currentAmount = currentAmountAsset(_amountAsset, _priceAsset)
-
-    _minMaxCurrentDif = _depositIND * (_newAmountMaxAsset -
-                                       _currentAmount) + _withdrawIND * (
-                                           _newAmountMinAsset - _currentAmount)
-
-    return _minMaxCurrentDif
-
-
-def rebalanceDeltaAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
-    _rebalanceDelta = np.zeros(nbAsset)
-
-    _depositIND = depositINDAsset(_TBDAmount)
-
-    _withdrawIND = withdrawINDAsset(_TBDAmount)
-
-    _newAmountMinAsset = newAmountAsset(_amountAsset, _priceAsset,
-                                        _weightAssets, _TBDAmount)[:, 0]
-
-    _newAmountMaxAsset = newAmountAsset(_amountAsset, _priceAsset,
-                                        _weightAssets, _TBDAmount)[:, 1]
-
-    _currentAmount = currentAmountAsset(_amountAsset, _priceAsset)
-
-    _rebalanceDelta = _depositIND * np.minimum(
-        _newAmountMaxAsset - _currentAmount,
-        np.zeros(nbAsset)) + _withdrawIND * np.maximum(
-            _newAmountMinAsset - _currentAmount, np.zeros(nbAsset))
-    return _rebalanceDelta
+    newAmount[:, 1] = (currentTotalAmount + TBDAmount) * weightAssets[:, 1]
+    newAmount[:, 2] = np.maximum(
+        (currentTotalAmount + TBDAmount) * weightAssets[:, 0],
+        (currentTotalAmount + TBDAmount) * weightAssets[:, 2],
+    )
+    return newAmount
 
 
-def rebalanceDeltaTotalAsset(_amountAsset, _priceAsset, _weightAssets,
-                             _TBDAmount):
+def minMaxCurrentDifAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the minimum and maximum current difference of asset.
 
-    return np.sum(
-        rebalanceDeltaAsset(_amountAsset, _priceAsset, _weightAssets,
-                            _TBDAmount))
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The minimum and maximum current difference of asset.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    minMaxCurrentDif = np.zeros(nbAsset)
+
+    depositIND = depositINDAsset(TBDAmount)
+
+    withdrawIND = withdrawINDAsset(TBDAmount)
+
+    newAmountMinAsset = newAmountAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )[:, 0]
+
+    newAmountMaxAsset = newAmountAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )[:, 2]
+
+    currentAmount = currentAmountAsset(amountAsset, priceAsset)
+
+    minMaxCurrentDif = depositIND * (
+        newAmountMaxAsset - currentAmount
+    ) + withdrawIND * (newAmountMinAsset - currentAmount)
+
+    return minMaxCurrentDif
 
 
-def rebalanceMinSizeDeltaAsset(_amountAsset, _priceAsset, _orderSizeAssets, _weightAssets, _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
-    _rebalanceDelta = rebalanceDeltaAsset(_amountAsset, _priceAsset,
-                                          _weightAssets, _TBDAmount)
+def rebalanceDeltaAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the rebalance delta of asset.
 
-    _rebalanceMinSizeDelta = np.zeros(nbAsset)
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The rebalance delta of asset.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    rebalanceDelta = np.zeros(nbAsset)
+
+    depositIND = depositINDAsset(TBDAmount)
+
+    withdrawIND = withdrawINDAsset(TBDAmount)
+
+    newAmountMinAsset = newAmountAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )[:, 0]
+
+    newAmountMaxAsset = newAmountAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )[:, 1]
+
+    currentAmount = currentAmountAsset(amountAsset, priceAsset)
+
+    rebalanceDelta = depositIND * np.minimum(
+        newAmountMaxAsset - currentAmount, np.zeros(nbAsset)
+    ) + withdrawIND * np.maximum(newAmountMinAsset - currentAmount, np.zeros(nbAsset))
+    return rebalanceDelta
+
+
+def rebalanceDeltaTotalAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> float:
+    """
+    Function to calculate the total rebalance delta of asset.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    float
+        The total rebalance delta of asset.
+    """
+    return np.sum(rebalanceDeltaAsset(amountAsset, priceAsset, weightAssets, TBDAmount))
+
+
+def rebalanceMinSizeDeltaAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the minimum size delta of asset for rebalancing.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The minimum size delta of asset for rebalancing.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    rebalanceDelta = rebalanceDeltaAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )
+
+    rebalanceMinSizeDelta = np.zeros(nbAsset)
 
     for i in range(nbAsset):
-        _rebalanceMinSizeDelta[i] = abs(_rebalanceDelta[i]) if (
-            _rebalanceDelta[i] < _orderSizeAssets[i, 0]) else 0
+        rebalanceMinSizeDelta[i] = (
+            abs(rebalanceDelta[i]) if (rebalanceDelta[i] < orderSizeAssets[i, 0]) else 0
+        )
 
-    return _rebalanceMinSizeDelta
+    return rebalanceMinSizeDelta
 
 
-def rebalanceMinSizeDeltaTotalAsset(_amountAsset, _priceAsset,
-                                    _orderSizeAssets, _weightAssets, _TBDAmount):
+def rebalanceMinSizeDeltaTotalAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> float:
+    """
+    Function to calculate the total minimum size delta of asset for rebalancing.
 
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    float
+        The total minimum size delta of asset for rebalancing.
+    """
     return np.sum(
-        rebalanceMinSizeDeltaAsset(_amountAsset, _priceAsset, _orderSizeAssets, _weightAssets, _TBDAmount))
+        rebalanceMinSizeDeltaAsset(
+            amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+        )
+    )
 
 
-def buyINDAsset(_amountAsset, _priceAsset, orderSizeAssets, _weightAssets,
-                _TBDAmount): 
-    nbAsset = np.shape(_amountAsset)[0]
-    _buyINDAsset = np.zeros(nbAsset)
+def buyINDAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to determine the buy indicator of asset.
 
-    _minMaxCurrentDif = minMaxCurrentDifAsset(_amountAsset, _priceAsset,
-                                              _weightAssets, _TBDAmount)
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The buy indicator of asset.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    buyINDAsset = np.zeros(nbAsset)
+
+    minMaxCurrentDif = minMaxCurrentDifAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )
 
     for i in range(nbAsset):
+        buyINDAsset[i] = 1 if minMaxCurrentDif[i] >= 0 else 0
 
-        _buyINDAsset[i] = 1 if _minMaxCurrentDif[i] >= 0 else 0
-
-    return _buyINDAsset
-
-
-def totalbuyOrderAsset(_amountAsset, _priceAsset, _orderSizeAssets,
-                       _weightAssets, _TBDAmount):
-    _buyIND = buyINDAsset(_amountAsset, _priceAsset, _orderSizeAssets,
-                          _weightAssets, _TBDAmount)
-
-    return np.sum(_buyIND)
+    return buyINDAsset
 
 
-def totalsellOrderAsset(_amountAsset, _priceAsset, orderSizeAssets, weightAssets,
-                     _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
+def totalbuyOrderAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> float:
+    """
+    Function to calculate the total buy order of asset.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    float
+        The total buy order of asset.
+    """
+    buyIND = buyINDAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
+
+    return np.sum(buyIND)
+
+
+def totalsellOrderAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> float:
+    """
+    Function to calculate the total sell order of asset.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    float
+        The total sell order of asset.
+    """
+    nbAsset = np.shape(amountAsset)[0]
     return nbAsset - totalbuyOrderAsset(
-        _amountAsset, _priceAsset, orderSizeAssets, weightAssets, _TBDAmount)
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
 
 
-def maxToMinRankAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
-    _minMaxCurrentDif = np.copy(
-        minMaxCurrentDifAsset(_amountAsset, _priceAsset, _weightAssets,
-                              _TBDAmount))
+def maxToMinRankAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the rank of asset from maximum to minimum.
 
-    _minMaxCurrentDifSorted = np.sort(_minMaxCurrentDif)[::-1]
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
 
-    _maxToMinRank = np.zeros(nbAsset)
+    Returns:
+    array
+        The rank of asset from maximum to minimum.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    minMaxCurrentDif = np.copy(
+        minMaxCurrentDifAsset(amountAsset, priceAsset, weightAssets, TBDAmount)
+    )
+
+    minMaxCurrentDifSorted = np.sort(minMaxCurrentDif)[::-1]
+
+    maxToMinRank = np.zeros(nbAsset)
 
     for i in range(nbAsset):
+        list = np.where(minMaxCurrentDifSorted == minMaxCurrentDif[i])[0]
 
-        _list = np.where(_minMaxCurrentDifSorted == _minMaxCurrentDif[i])[0]
+        rank = list[0]
 
-        _rank = _list[0]
+        count = np.size(list)
 
-        _count = np.size(_list)
+        maxToMinRank[i] = rank + count - 1
 
-        _maxToMinRank[i] = _rank + _count - 1
-
-    return _maxToMinRank
+    return maxToMinRank
 
 
-def minToMaxRankAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
-    _minToMaxRank = np.zeros(nbAsset)
+def minToMaxRankAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the rank of asset from minimum to maximum.
 
-    _minMaxCurrentDif = np.copy(
-        minMaxCurrentDifAsset(_amountAsset, _priceAsset, _weightAssets,
-                              _TBDAmount))
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
 
-    _minMaxCurrentDifSorted = np.sort(_minMaxCurrentDif)
+    Returns:
+    array
+        The rank of asset from minimum to maximum.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    minToMaxRank = np.zeros(nbAsset)
+
+    minMaxCurrentDif = np.copy(
+        minMaxCurrentDifAsset(amountAsset, priceAsset, weightAssets, TBDAmount)
+    )
+
+    minMaxCurrentDifSorted = np.sort(minMaxCurrentDif)
 
     for i in range(nbAsset):
+        list = np.where(minMaxCurrentDifSorted == minMaxCurrentDif[i])[0]
 
-        _list = np.where(_minMaxCurrentDifSorted == _minMaxCurrentDif[i])[0]
+        rank = list[0]
 
-        _rank = _list[0]
+        count = np.size(list)
 
-        _count = np.size(_list)
-
-        _minToMaxRank[i] = _rank + _count - 1
-    return _minToMaxRank
-
-
-def assetCapRankAsset(_amountAsset, _priceAsset, _orderSizeAssets,
-                      _weightAssets, _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
-    _assetCapRank = np.zeros(nbAsset)
-
-    _maxToMinRank = maxToMinRankAsset(_amountAsset, _priceAsset, _weightAssets,
-                                      _TBDAmount)
-
-    _minToMaxRank = minToMaxRankAsset(_amountAsset, _priceAsset, _weightAssets,
-                                      _TBDAmount)
-
-    _buyIND = buyINDAsset(_amountAsset, _priceAsset, _orderSizeAssets,
-                          _weightAssets, _TBDAmount)
-
-    _totalsellOrderst = totalsellOrderAsset(_amountAsset, _priceAsset,
-                                         _orderSizeAssets, _weightAssets,
-                                         _TBDAmount)
-
-    _assetCapRank = _minToMaxRank + _buyIND * (_maxToMinRank - _minToMaxRank +
-                                               _totalsellOrderst)
-
-    return np.int32(_assetCapRank)
+        minToMaxRank[i] = rank + count - 1
+    return minToMaxRank
 
 
-def rawCapFilledAsset(_amountAsset, _priceAsset, _orderSizeAssets,
-                      _weightAssets, _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
+def assetCapRankAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> np.int32:
+    """
+    Function to calculate the asset cap rank.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The asset cap rank.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    assetCapRank = np.zeros(nbAsset)
+
+    maxToMinRank = maxToMinRankAsset(amountAsset, priceAsset, weightAssets, TBDAmount)
+
+    minToMaxRank = minToMaxRankAsset(amountAsset, priceAsset, weightAssets, TBDAmount)
+
+    buyIND = buyINDAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
+
+    totalsellOrderst = totalsellOrderAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
+
+    assetCapRank = minToMaxRank + buyIND * (
+        maxToMinRank - minToMaxRank + totalsellOrderst
+    )
+
+    return np.int32(assetCapRank)
+
+
+def rawCapFilledAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the raw cap filled of asset.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The raw cap filled of asset.
+    """
+    nbAsset = np.shape(amountAsset)[0]
     rawCapFilled = np.zeros(nbAsset)
 
-    _minMaxCurrentDif = minMaxCurrentDifAsset(_amountAsset, _priceAsset,
-                                              _weightAssets, _TBDAmount)
+    minMaxCurrentDif = minMaxCurrentDifAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )
 
-    _assetCapRank = assetCapRankAsset(_amountAsset, _priceAsset,
-                                      _orderSizeAssets, _weightAssets,
-                                      _TBDAmount)
+    assetCapRank = assetCapRankAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
 
     for i in range(nbAsset):
-
-        rawCapFilled[i] = np.sum(_minMaxCurrentDif[0:_assetCapRank[i]])
+        rawCapFilled[i] = np.sum(minMaxCurrentDif[0 : assetCapRank[i]])
 
     return rawCapFilled
 
 
-def capToFillAsset(_amountAsset, _priceAsset, _orderSizeAssets, _weightAssets,
-                   _TBDAmount):
-    _depositIND = depositINDAsset(_TBDAmount)
+def capToFillAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the cap to fill of asset.
 
-    _minMaxCurrentDif = minMaxCurrentDifAsset(_amountAsset, _priceAsset,
-                                              _weightAssets, _TBDAmount)
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
 
-    _rebalanceMinSizeDeltaTotal = rebalanceMinSizeDeltaTotalAsset(
-        _amountAsset, _priceAsset, _orderSizeAssets, _weightAssets, _TBDAmount)
+    Returns:
+    array
+        The cap to fill of asset.
+    """
+    depositIND = depositINDAsset(TBDAmount)
 
-    _rawCapFilled = rawCapFilledAsset(_amountAsset, _priceAsset,
-                                      _orderSizeAssets, _weightAssets,
-                                      _TBDAmount)
+    minMaxCurrentDif = minMaxCurrentDifAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )
 
-    _depositTerm = _depositIND * np.minimum(
-        _minMaxCurrentDif,
-        (_TBDAmount + _rebalanceMinSizeDeltaTotal - np.minimum(
-            (_TBDAmount + _rebalanceMinSizeDeltaTotal), _rawCapFilled)))
+    rebalanceMinSizeDeltaTotal = rebalanceMinSizeDeltaTotalAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
 
-    _withdrawIND = withdrawINDAsset(_TBDAmount)
+    rawCapFilled = rawCapFilledAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
 
-    _rebalanceDeltaTotal = rebalanceDeltaTotalAsset(_amountAsset, _priceAsset,
-                                                    _weightAssets, _TBDAmount)
+    depositTerm = depositIND * np.minimum(
+        minMaxCurrentDif,
+        (
+            TBDAmount
+            + rebalanceMinSizeDeltaTotal
+            - np.minimum((TBDAmount + rebalanceMinSizeDeltaTotal), rawCapFilled)
+        ),
+    )
 
-    _withdrawTerm = _withdrawIND * np.minimum(
-        _minMaxCurrentDif, (_TBDAmount + _rebalanceDeltaTotal - np.minimum(
-            (_TBDAmount + _rebalanceDeltaTotal), _rawCapFilled)))
-    return _depositTerm + _withdrawTerm
+    withdrawIND = withdrawINDAsset(TBDAmount)
+
+    rebalanceDeltaTotal = rebalanceDeltaTotalAsset(
+        amountAsset, priceAsset, weightAssets, TBDAmount
+    )
+
+    withdrawTerm = withdrawIND * np.minimum(
+        minMaxCurrentDif,
+        (
+            TBDAmount
+            + rebalanceDeltaTotal
+            - np.minimum((TBDAmount + rebalanceDeltaTotal), rawCapFilled)
+        ),
+    )
+    return depositTerm + withdrawTerm
 
 
-def minOrderAsset(_amountAsset, _priceAsset, _orderSizeAssets, _weightAssets,
-                  _TBDAmount):
-    nbAsset = np.shape(_amountAsset)[0]
-    _minOrder = np.zeros(nbAsset)
+def minOrderAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the minimum order of asset.
 
-    _capToFillAsset = capToFillAsset(_amountAsset, _priceAsset,
-                                     _orderSizeAssets, _weightAssets,
-                                     _TBDAmount)
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The minimum order of asset.
+    """
+    nbAsset = np.shape(amountAsset)[0]
+    minOrder = np.zeros(nbAsset)
+
+    _capToFillAsset = capToFillAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
 
     for i in range(nbAsset):
+        minOrder[i] = 1 if abs(_capToFillAsset[i]) >= orderSizeAssets[i, 0] else 0
+    return minOrder
 
-        _minOrder[i] = 1 if abs(_capToFillAsset[i]) >= _orderSizeAssets[i, 0] else 0
-    return _minOrder
 
+def additionalOrdersAsset(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the additional orders of asset.
 
-def additionalOrdersAsset(_amountAsset, _priceAsset, _orderSizeAssets,
-                          _weightAssets, _TBDAmount):
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The additional orders of asset.
+    """
     _capToFillAsset = np.absolute(
-        capToFillAsset(_amountAsset, _priceAsset, _orderSizeAssets,
-                       _weightAssets, _TBDAmount))
-    return np.floor(_capToFillAsset / _orderSizeAssets[:, 1])
+        capToFillAsset(
+            amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+        )
+    )
+    return np.floor(_capToFillAsset / orderSizeAssets[:, 1])
 
 
-def totalOrders(amountAsset, _priceAsset, _orderSizeAssets, _weightAssets,
-                _TBDAmount):
+def totalOrders(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the total orders of asset.
 
-    return minOrderAsset(amountAsset, _priceAsset, _orderSizeAssets,
-                         _weightAssets, _TBDAmount) + additionalOrdersAsset(
-                             amountAsset, _priceAsset, _orderSizeAssets,
-                             _weightAssets, _TBDAmount)
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The total orders of asset.
+    """
+    return minOrderAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    ) + additionalOrdersAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
 
 
-def orderSize(_amountAsset, _priceAsset, _orderSizeAssets, _weightAssets,
-              _TBDAmount):
-    _capToFillAsset = capToFillAsset(_amountAsset, _priceAsset,
-                                     _orderSizeAssets, _weightAssets,
-                                     _TBDAmount)
-    _additionalOrders = additionalOrdersAsset(_amountAsset, _priceAsset,
-                                              _orderSizeAssets, _weightAssets,
-                                              _TBDAmount)
-    return _capToFillAsset / (_additionalOrders + 1)
+def orderSize(
+    amountAsset: NDArray,
+    priceAsset: NDArray,
+    orderSizeAssets: NDArray,
+    weightAssets: NDArray,
+    TBDAmount: float,
+) -> NDArray:
+    """
+    Function to calculate the order size of asset.
+
+    Parameters:
+    amountAsset : array
+        The amount of asset.
+    priceAsset : array
+        The price of asset.
+    orderSizeAssets : array
+        The order size of assets.
+    weightAssets : array
+        The weight of assets.
+    TBDAmount : float
+        The amount to be determined.
+
+    Returns:
+    array
+        The order size of asset.
+    """
+    _capToFillAsset = capToFillAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
+    additionalOrders = additionalOrdersAsset(
+        amountAsset, priceAsset, orderSizeAssets, weightAssets, TBDAmount
+    )
+    return _capToFillAsset / (additionalOrders + 1)
