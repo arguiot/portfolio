@@ -23,6 +23,7 @@ from portfolio_optimization.utils import ProgressLogger
 
 from portfolio_optimization.portfolio.Portfolio import Portfolio
 from portfolio_optimization.backtesting.Backtesting import Backtest
+from portfolio_optimization.portfolio.parity import optimal_strategy
 from dateutil.relativedelta import relativedelta
 
 
@@ -254,6 +255,8 @@ def run_for_asset_class(
         perfs, f"./out/{rebalance_frequency}/", f"backtest_results_{asset_class}.xlsx"
     )
 
+    return perfs
+
 
 if __name__ == "__main__":
     import warnings
@@ -301,12 +304,17 @@ if __name__ == "__main__":
             backtests.append(backtest)
             loggers.append(logger)
 
+        perfs = []
         for backtest in backtests:
             asset_class = backtest.asset_class
             logger = loggers[backtests.index(backtest)]
-            run_for_asset_class(
-                backtest=backtest,
-                rebalance_frequency=rebalance_frequency,
-                progress_logger=logger,
+            perfs.append(
+                run_for_asset_class(
+                    backtest=backtest,
+                    rebalance_frequency=rebalance_frequency,
+                    progress_logger=logger,
+                )
             )
+        parity_weights = optimal_strategy(perfs)
+        print(parity_weights)
     progress_logger.delete()
