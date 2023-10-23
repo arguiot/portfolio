@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from ..optimization.GeneralOptimization import GeneralOptimization
 from ..optimization.heuristic import VolatilityOfVolatility
+from .delegate import PortfolioDelegate
 from typing import Type
 from .weight_diff import weight_diff
 from typing import Dict
@@ -21,6 +22,7 @@ class Portfolio:
     ):
         self.optimiser = optimiser
         self.weights = pd.Series()
+        self.delegate = PortfolioDelegate()
         self.raw_weights = pd.Series()
         initial_prices = initial_prices.dropna(axis=1)
         current_prices = initial_prices.iloc[-1]
@@ -138,14 +140,18 @@ class Portfolio:
             f"Sum of raw weights is {new_weights.sum()}, " f"but expected value is 1."
         )
         real_weights = self.get_current_weights(current_prices)
-        self.weights = new_weights  # weight_diff(
-        #    real_weights, new_weights, applied=True, threshold=self.weight_threshold
-        # )
+        self.weights = new_weights
+
         assert np.isclose(self.weights.sum(), 1, 0.01), (
             f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
         )
 
-        self.holdings = self.weights * base_value / pd.Series(current_prices)
+        if not hasattr(self, "holdings"):
+            self.holdings = self.weights * base_value / current_prices
+
+        self.holdings = self.delegate.rebalance(
+            self.holdings, current_prices, self.weights
+        )
 
     def get_weights(self):
         """

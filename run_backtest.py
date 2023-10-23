@@ -1,3 +1,4 @@
+import pandas as pd
 from portfolio_optimization.data_processing import *
 from portfolio_optimization.data_collection import *
 from datetime import timedelta
@@ -22,9 +23,29 @@ from portfolio_optimization.optimization.heuristic import (
 from portfolio_optimization.utils import ProgressLogger
 
 from portfolio_optimization.portfolio.Portfolio import Portfolio
+from portfolio_optimization.portfolio.delegate import PortfolioDelegate
+from portfolio_optimization.portfolio.rebalancing import optimize_trades
 from portfolio_optimization.backtesting.Backtesting import Backtest
 from portfolio_optimization.portfolio.parity import optimal_strategy
 from dateutil.relativedelta import relativedelta
+
+
+class CustomPortfolioDelegate(PortfolioDelegate):
+    def rebalance(
+        self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
+    ) -> pd.Series:
+        new_holdings = optimize_trades(
+            holdings=holdings.values,
+            new_target_weights=target_weights.values,
+            prices=prices.values,
+            min_W=0,
+            max_W=1,
+            external_movement=0,
+            l1_reg=0.0,
+        )
+
+        new_holdings = pd.Series(new_holdings, index=holdings.index)
+        return new_holdings
 
 
 def create_portfolios(
@@ -124,6 +145,8 @@ def create_portfolios(
         lambda_var=0.1,
         lambda_u=0.1,
     )
+
+    portfolio_parity.delegate = CustomPortfolioDelegate()
 
     portfolio_fast_parity = Portfolio(
         base_value=initial_bid,
