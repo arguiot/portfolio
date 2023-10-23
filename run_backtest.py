@@ -34,17 +34,16 @@ class CustomPortfolioDelegate(PortfolioDelegate):
     def rebalance(
         self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
     ) -> pd.Series:
-        new_holdings = optimize_trades(
-            holdings=holdings.values,
-            new_target_weights=target_weights.values,
-            prices=prices.values,
-            min_W=0,
-            max_W=1,
+        diff = optimize_trades(
+            holdings=holdings,
+            new_target_weights=target_weights,
+            prices=prices,
+            min_W=0.0,
+            max_W=1.0,
             external_movement=0,
-            l1_reg=0.0,
         )
 
-        new_holdings = pd.Series(new_holdings, index=holdings.index)
+        new_holdings = pd.Series(diff, index=holdings.index) + holdings
         return new_holdings
 
 

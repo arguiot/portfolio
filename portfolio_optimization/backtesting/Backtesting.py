@@ -165,11 +165,11 @@ class Backtest:
 
         portfolio_performances = []
 
-        with Pool() as p:
-            portfolio_performances = p.starmap(
-                self.process_portfolio,
-                [
-                    (
+        # if there is only one portfolio, we don't need to use multiprocessing
+        if len(self.portfolios) == 1:
+            for name, portfolio in self.portfolios.items():
+                portfolio_performances.append(
+                    self.process_portfolio(
                         name,
                         portfolio,
                         total_dates,
@@ -179,9 +179,25 @@ class Backtest:
                         yield_data,
                         progress_logger,
                     )
-                    for name, portfolio in self.portfolios.items()
-                ],
-            )
+                )
+        else:
+            with Pool() as p:
+                portfolio_performances = p.starmap(
+                    self.process_portfolio,
+                    [
+                        (
+                            name,
+                            portfolio,
+                            total_dates,
+                            rebalance_dates,
+                            look_back_period,
+                            look_back_unit,
+                            yield_data,
+                            progress_logger,
+                        )
+                        for name, portfolio in self.portfolios.items()
+                    ],
+                )
 
         return portfolio_performances
 

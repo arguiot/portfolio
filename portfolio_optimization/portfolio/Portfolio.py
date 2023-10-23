@@ -31,6 +31,7 @@ class Portfolio:
         self.weight_threshold = weight_threshold
         self.kwargs = kwargs
         self.latest_apy: pd.Series | None = None
+        self.base_value = base_value
         # Remove keys from mcaps that are not in initial_prices columns
         if mcaps is not None:
             mcaps = mcaps.reindex(initial_prices.columns)
@@ -147,7 +148,7 @@ class Portfolio:
         )
 
         if not hasattr(self, "holdings"):
-            self.holdings = self.weights * base_value / current_prices
+            self.holdings = base_value * self.weights / current_prices
 
         self.holdings = self.delegate.rebalance(
             self.holdings, current_prices, self.weights
@@ -217,7 +218,7 @@ class Portfolio:
         """
         # if holdings doesn't exist, return 0
         if not hasattr(self, "holdings"):
-            return 0
+            return self.base_value
         return (self.holdings * prices).sum()
 
     def apply_yield(self, apy: pd.Series, compounded: bool = True):
