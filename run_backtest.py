@@ -31,9 +31,10 @@ from portfolio_optimization.portfolio.rebalancing import optimize_trades
 from portfolio_optimization.backtesting.Backtesting import Backtest
 from portfolio_optimization.portfolio.parity import optimal_strategy
 from dateutil.relativedelta import relativedelta
+from portfolio_optimization.portfolio.trade_generator import totalOrders, orderSize
 
 
-class CustomPortfolioDelegate(PortfolioDelegate):
+class OptRebalancingPortfolioDelegate(PortfolioDelegate):
     def rebalance(
         self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
     ) -> pd.Series:
@@ -50,10 +51,46 @@ class CustomPortfolioDelegate(PortfolioDelegate):
         return new_holdings
 
 
+class HeuristicRebalancingPortfolioDelegate(PortfolioDelegate):
+    def rebalance(
+        self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
+    ) -> pd.Series:
+        tbd = 0
+        weight_assets = [
+            (
+                target_weights[i],  # - 0.1 * target_weights[i],
+                target_weights[i],
+                target_weights[i],  # + 0.1 * target_weights[i]
+            )
+            for i in target_weights.index
+        ]
+        order_size_assets = [(50, 1000) for i in target_weights.index]
+
+        orders = totalOrders(
+            np.array(holdings),
+            np.array(prices),
+            np.array(order_size_assets),
+            np.array(weight_assets),
+            tbd,
+        )
+
+        sizes = orderSize(
+            np.array(holdings),
+            np.array(prices),
+            np.array(order_size_assets),
+            np.array(weight_assets),
+            tbd,
+        )
+
+        trades = orders * sizes
+
+        return holdings + trades / prices
+
+
 class CustomMarkowitzDelegate(GeneralOptimizationDelegate):
     def setup(self, optimization_object: Markowitz):
         optimization_object.mode = optimization_object.CovMode.LEDOIT_WOLF
-        optmization_object.efficient_portfolio = (
+        optimization_object.efficient_portfolio = (
             optimization_object.EfficientPortfolio.MAX_SHARPE
         )
         return super().setup(optimization_object)
@@ -117,6 +154,8 @@ def create_portfolios(
 
     initial_bid = 1000
 
+    chosen_delegate = HeuristicRebalancingPortfolioDelegate()
+
     porfolio_hrp = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -125,6 +164,8 @@ def create_portfolios(
         min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
+
+    porfolio_hrp.delegate = chosen_delegate
 
     portfolio_markowitz = Portfolio(
         base_value=initial_bid,
@@ -135,6 +176,8 @@ def create_portfolios(
         weight_threshold=weight_threshold,
     )
 
+    portfolio_markowitz.delegate = chosen_delegate
+
     portfolio_bl = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -144,6 +187,8 @@ def create_portfolios(
         min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
+
+    portfolio_bl.delegate = chosen_delegate
 
     portfolio_parity = Portfolio(
         base_value=initial_bid,
@@ -157,7 +202,7 @@ def create_portfolios(
         lambda_u=0.1,
     )
 
-    portfolio_parity.delegate = CustomPortfolioDelegate()
+    portfolio_parity.delegate = chosen_delegate
 
     portfolio_fast_parity = Portfolio(
         base_value=initial_bid,
@@ -168,6 +213,8 @@ def create_portfolios(
         weight_threshold=weight_threshold,
     )
 
+    portfolio_fast_parity.delegate = chosen_delegate
+
     portfolio_default = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -176,6 +223,8 @@ def create_portfolios(
         min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
+
+    portfolio_default.delegate = chosen_delegate
 
     portfolio_rtr = Portfolio(
         base_value=initial_bid,
@@ -186,6 +235,8 @@ def create_portfolios(
         weight_threshold=weight_threshold,
     )
 
+    portfolio_rtr.delegate = chosen_delegate
+
     portfolio_vo = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -193,6 +244,8 @@ def create_portfolios(
         max_weight=max_weight,
         weight_threshold=weight_threshold,
     )
+
+    portfolio_vo.delegate = chosen_delegate
 
     portfolio_vov = Portfolio(
         base_value=initial_bid,
@@ -203,6 +256,8 @@ def create_portfolios(
         weight_threshold=weight_threshold,
     )
 
+    portfolio_vov.delegate = chosen_delegate
+
     portfolio_var = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -211,6 +266,8 @@ def create_portfolios(
         min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
+
+    portfolio_var.delegate = chosen_delegate
 
     portfolio_rvar = Portfolio(
         base_value=initial_bid,
@@ -221,6 +278,8 @@ def create_portfolios(
         weight_threshold=weight_threshold,
     )
 
+    portfolio_rvar.delegate = chosen_delegate
+
     portfolio_combination = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
@@ -229,6 +288,8 @@ def create_portfolios(
         min_weight=min_weight,
         weight_threshold=weight_threshold,
     )
+
+    portfolio_combination.delegate = chosen_delegate
 
     print(f"[REBALANCE FREQUENCY]: {rebalance_frequency}")
 
