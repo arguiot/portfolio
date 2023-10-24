@@ -2,6 +2,7 @@ from .GeneralOptimization import GeneralOptimization
 from pypfopt.hierarchical_portfolio import HRPOpt
 from ..data_processing.expected_returns import expected_returns
 import pandas as pd
+import riskfolio as rp
 
 
 class HRPOptimization(GeneralOptimization):
@@ -30,14 +31,15 @@ class HRPOptimization(GeneralOptimization):
 
     """
 
-    def __init__(self, df, mcaps=None, rets=None):
+    def __init__(self, df, mcaps=None, rets=None, asset_weight_bounds={"*": (0, 1)}):
         super().__init__(df, mcaps=mcaps)
+        self.asset_weight_bounds = asset_weight_bounds
         if rets is None:
             self.rets = expected_returns(df)
         else:
             self.rets = rets
         self.rets = self.rets.fillna(0)
-        self.hrp = HRPOpt(self.rets)
+        self.port = rp.HCPortfolio(returns=self.rets)
 
     def optimize(self):
         """
@@ -54,7 +56,27 @@ class HRPOptimization(GeneralOptimization):
         None
 
         """
-        self.hrp.optimize()
+
+        self.process_asset_weight_bounds()
+        min_vec = pd.Series(
+            [self.asset_weight_bounds[asset][0] for asset in self.df.columns],
+            index=self.df.columns,
+        )
+        max_vec = pd.Series(
+            [self.asset_weight_bounds[asset][1] for asset in self.df.columns],
+            index=self.df.columns,
+        )
+        self.port.w_min = min_vec
+        self.port.w_max = max_vec
+
+        self.weights = self.port.optimization(
+            model="HRP",
+            codependence="pearson",
+            rm="MV",
+            rf=0.0,
+            linkage="single",
+            leaf_order=True,
+        )["weights"]
 
     def clean_weights(self):
         """
@@ -71,7 +93,7 @@ class HRPOptimization(GeneralOptimization):
         None
 
         """
-        self.weights = pd.Series(self.hrp.clean_weights())
+        # self.weights = self.weights.loc[self.weights > 1e-4]
 
     def get_weights(self):
         """
@@ -91,30 +113,8 @@ class HRPOptimization(GeneralOptimization):
 
         """
         self.optimize()
-        self.clean_weights()
+        # self.clean_weights()
         return self.weights
 
     def get_metrics(self):
-        """
-        Get the metrics, such as performances, for the optimized portfolio.
-
-        This method returns the metrics for the optimized portfolio.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        dict
-            a dictionary containing the metrics for the optimized portfolio
-
-        """
-        if self.hrp.weights is None:
-            return None
-        metrics = self.hrp.portfolio_performance(verbose=False, frequency=365)
-        return {
-            "apy": metrics[0],
-            "annual_volatility": metrics[1],
-            "sharpe_ratio": metrics[2],
-        }
+        pass

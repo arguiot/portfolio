@@ -408,91 +408,26 @@ def totalsellOrderAsset(
     )
 
 
-def maxToMinRankAsset(
-    amountAsset: NDArray,
-    priceAsset: NDArray,
-    weightAssets: NDArray,
-    TBDAmount: float,
-) -> NDArray:
-    """
-    Function to calculate the rank of asset from maximum to minimum.
-
-    Parameters:
-    amountAsset : array
-        The amount of asset.
-    priceAsset : array
-        The price of asset.
-    weightAssets : array
-        The weight of assets.
-    TBDAmount : float
-        The amount to be determined.
-
-    Returns:
-    array
-        The rank of asset from maximum to minimum.
-    """
-    nbAsset = np.shape(amountAsset)[0]
-    minMaxCurrentDif = np.copy(
-        minMaxCurrentDifAsset(amountAsset, priceAsset, weightAssets, TBDAmount)
+def maxToMinRankAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount):
+    nbAsset = np.shape(_amountAsset)[0]
+    _minMaxCurrentDif = np.copy(
+        minMaxCurrentDifAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount)
     )
 
-    minMaxCurrentDifSorted = np.sort(minMaxCurrentDif)[::-1]
-
-    maxToMinRank = np.zeros(nbAsset)
-
-    for i in range(nbAsset):
-        list = np.where(minMaxCurrentDifSorted == minMaxCurrentDif[i])[0]
-
-        rank = list[0]
-
-        count = np.size(list)
-
-        maxToMinRank[i] = rank + count - 1
-
-    return maxToMinRank
+    _minMaxCurrentDifSorted = _minMaxCurrentDif.argsort()[::-1][:nbAsset]
+    return _minMaxCurrentDifSorted
 
 
-def minToMaxRankAsset(
-    amountAsset: NDArray,
-    priceAsset: NDArray,
-    weightAssets: NDArray,
-    TBDAmount: float,
-) -> NDArray:
-    """
-    Function to calculate the rank of asset from minimum to maximum.
+def minToMaxRankAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount):
+    # nbAsset = np.shape(_amountAsset)[0]
+    # _minToMaxRank = np.zeros(nbAsset)
 
-    Parameters:
-    amountAsset : array
-        The amount of asset.
-    priceAsset : array
-        The price of asset.
-    weightAssets : array
-        The weight of assets.
-    TBDAmount : float
-        The amount to be determined.
-
-    Returns:
-    array
-        The rank of asset from minimum to maximum.
-    """
-    nbAsset = np.shape(amountAsset)[0]
-    minToMaxRank = np.zeros(nbAsset)
-
-    minMaxCurrentDif = np.copy(
-        minMaxCurrentDifAsset(amountAsset, priceAsset, weightAssets, TBDAmount)
+    _minMaxCurrentDif = np.copy(
+        minMaxCurrentDifAsset(_amountAsset, _priceAsset, _weightAssets, _TBDAmount)
     )
 
-    minMaxCurrentDifSorted = np.sort(minMaxCurrentDif)
-
-    for i in range(nbAsset):
-        list = np.where(minMaxCurrentDifSorted == minMaxCurrentDif[i])[0]
-
-        rank = list[0]
-
-        count = np.size(list)
-
-        minToMaxRank[i] = rank + count - 1
-    return minToMaxRank
+    _minMaxCurrentDifSorted = _minMaxCurrentDif.argsort()
+    return _minMaxCurrentDifSorted
 
 
 def assetCapRankAsset(

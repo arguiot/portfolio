@@ -47,11 +47,14 @@ def optimize_trades(
 
     objective = cp.Minimize(
         cp.sum_squares(new_weights - new_target_weights.values)
-        # + cp.norm(new_holdings - holdings.values, 2)
+        # + cp.sum_squares(new_holdings - holdings.values)
     )
 
     problem = cp.Problem(objective, constraints)
     problem.solve(warm_start=True)
+
+    print(new_weights.value - new_target_weights.values)
+    print(problem.status)
 
     if problem.status == cp.INFEASIBLE:
         raise Exception(

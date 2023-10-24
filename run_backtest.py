@@ -6,6 +6,9 @@ from tokens.get_assets import *
 import numpy as np
 import copy
 import sys
+from portfolio_optimization.optimization.GeneralOptimization import (
+    GeneralOptimizationDelegate,
+)
 from portfolio_optimization.optimization.hrp import HRPOptimization
 from portfolio_optimization.optimization.markowitz import Markowitz
 from portfolio_optimization.optimization.black_litterman import BlackLitterman
@@ -45,6 +48,15 @@ class CustomPortfolioDelegate(PortfolioDelegate):
 
         new_holdings = pd.Series(diff, index=holdings.index) + holdings
         return new_holdings
+
+
+class CustomMarkowitzDelegate(GeneralOptimizationDelegate):
+    def setup(self, optimization_object: Markowitz):
+        optimization_object.mode = optimization_object.CovMode.LEDOIT_WOLF
+        optmization_object.efficient_portfolio = (
+            optimization_object.EfficientPortfolio.MAX_SHARPE
+        )
+        return super().setup(optimization_object)
 
 
 def create_portfolios(
@@ -117,7 +129,7 @@ def create_portfolios(
     portfolio_markowitz = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
-        optimiser=Markowitz,
+        optimiser=Markowitz.bind(CustomMarkowitzDelegate()),
         max_weight=max_weight,
         min_weight=min_weight,
         weight_threshold=weight_threshold,

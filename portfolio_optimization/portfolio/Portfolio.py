@@ -3,7 +3,7 @@ import numpy as np
 from ..optimization.GeneralOptimization import GeneralOptimization
 from ..optimization.heuristic import VolatilityOfVolatility
 from .delegate import PortfolioDelegate
-from typing import Type
+from typing import Type, Callable
 from .weight_diff import weight_diff
 from typing import Dict
 
@@ -13,7 +13,7 @@ class Portfolio:
         self,
         base_value: float,
         initial_prices: pd.DataFrame,
-        optimiser: Type[GeneralOptimization],
+        optimiser: Type[GeneralOptimization] | Callable[..., GeneralOptimization],
         mcaps: pd.Series | pd.DataFrame | None = None,
         max_weight: float | Dict[str, float] = 1.0,
         min_weight: float | Dict[str, float] = 0.0,

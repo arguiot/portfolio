@@ -63,14 +63,19 @@ class RiskParity(GeneralOptimization):
         self.Dmat: NDArray[np.float64] = np.vstack(
             [-np.eye(num_assets), np.eye(num_assets)]
         )  # 2n x n matrix
-        vecs = self.asset_weight_bounds.values()  # Array of tuples (min, max)
-        min_vecs, max_vecs = zip(
-            *vecs
-        )  # Separates the min and max values into two arrays
+        self.process_asset_weight_bounds()
+        min_vec = pd.Series(
+            [self.asset_weight_bounds[asset][0] for asset in self.df.columns],
+            index=self.df.columns,
+        )
+        max_vec = pd.Series(
+            [self.asset_weight_bounds[asset][1] for asset in self.df.columns],
+            index=self.df.columns,
+        )
         self.dvec: NDArray[np.float64] = np.concatenate(
             [
-                -np.ones(num_assets) * np.array(min_vecs),
-                np.ones(num_assets) * np.array(max_vecs),
+                -np.ones(num_assets) * np.array(min_vec),
+                np.ones(num_assets) * np.array(max_vec),
             ]
         )  # 2n vector
 

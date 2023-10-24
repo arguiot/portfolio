@@ -1,6 +1,6 @@
 from enum import Enum
 from .GeneralOptimization import GeneralOptimization
-from pypfopt.risk_models import CovarianceShrinkage, sample_cov
+from pypfopt.risk_models import risk_matrix
 from pypfopt import expected_returns
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import plotting
@@ -14,9 +14,19 @@ class Markowitz(GeneralOptimization):
     Markowitz portfolio optimization.
     """
 
-    class Mode(Enum):
-        SAMPLE_COV = 1
-        LEDOIT_WOLF = 2
+    class CovMode(Enum):
+        SAMPLE_COV = "sample_cov"
+        SEMICOVARIANCE = "semicovariance"
+        EXP_COV = "exp_cov"
+        LEDOIT_WOLF = "ledoit_wolf"
+        LEDOIT_WOLF_CONSTANT_VARIANCE = "ledoit_wolf_constant_variance"
+        LEDOIT_WOLF_SINGLE_FACTOR = "ledoit_wolf_single_factor"
+        LEDOIT_WOLF_CONSTANT_CORRELATION = "ledoit_wolf_constant_correlation"
+        ORACLE_APPROXIMATING = "oracle_approximating"
+
+    class EfficientPortfolio(Enum):
+        MAX_SHARPE = "max_sharpe"
+        MIN_VOLATILITY = "min_volatility"
 
     def __init__(self, df, mcaps=None, cov=None, weight_bounds=(0, 1)):
         """
@@ -30,7 +40,10 @@ class Markowitz(GeneralOptimization):
         super().__init__(df, mcaps=mcaps)
 
         self.weight_bounds = weight_bounds
-        self.mode = self.Mode.LEDOIT_WOLF
+        self.mode = self.CovMode.LEDOIT_WOLF
+        self.efficient_portfolio = self.EfficientPortfolio.MAX_SHARPE
+
+        self.delegate.setup(self)  # Additional setup
 
         if cov is None:
             self.cov_matrix = self.get_cov_matrix()
@@ -57,7 +70,8 @@ class Markowitz(GeneralOptimization):
         return ef
 
     def get_weights(
-        self, risk_free_rate=None
+        self,
+        risk_free_rate=None,
     ):  # Risk free rate is set to -5% by default, which is the rate for the US Dollar during inflation
         """
         Get the optimized portfolio weights.
@@ -75,7 +89,14 @@ class Markowitz(GeneralOptimization):
             "Expected returns are less than the risk free rate. "
             "This is not possible. Please check your data."
         )
-        self.ef.max_sharpe(risk_free_rate=risk_free_rate)
+        if isinstance(self.efficient_portfolio, self.EfficientPortfolio):
+            if self.efficient_portfolio == self.EfficientPortfolio.MAX_SHARPE:
+                self.ef.max_sharpe(risk_free_rate=risk_free_rate)
+            elif self.efficient_portfolio == self.EfficientPortfolio.MIN_VOLATILITY:
+                self.ef.min_volatility()
+        elif isinstance(self.efficient_portfolio, float):
+            self.ef.efficient_return(self.efficient_portfolio)
+
         weights = self.ef.clean_weights()
         return pd.Series(weights)
 
@@ -145,7 +166,4 @@ class Markowitz(GeneralOptimization):
         cov_matrix : pandas.DataFrame
             A pandas DataFrame object containing the covariance matrix for the given data.
         """
-        if self.mode == self.Mode.SAMPLE_COV:
-            return sample_cov(self.df)
-        elif self.mode == self.Mode.LEDOIT_WOLF:
-            return CovarianceShrinkage(self.df).ledoit_wolf()
+        return risk_matrix(self.df, method=self.mode.value)
