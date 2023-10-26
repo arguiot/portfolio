@@ -1,7 +1,6 @@
 from enum import Enum
 from .GeneralOptimization import GeneralOptimization
 from pypfopt.risk_models import risk_matrix
-from pypfopt import expected_returns
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt import plotting
 import matplotlib.pyplot as plt
@@ -43,14 +42,8 @@ class Markowitz(GeneralOptimization):
         self.mode = self.CovMode.LEDOIT_WOLF
         self.efficient_portfolio = self.EfficientPortfolio.MAX_SHARPE
 
-        self.delegate.setup(self)  # Additional setup
-
-        if cov is None:
-            self.cov_matrix = self.get_cov_matrix()
-        else:
-            self.cov_matrix = cov
-
-        self.rets = expected_returns.mean_historical_return(df)
+        self.cov_matrix = cov
+        self.rets = None
 
     def efficient_frontier(self):
         """
@@ -81,6 +74,7 @@ class Markowitz(GeneralOptimization):
         weights : pandas.Series
             A pandas Series object containing the optimized weights for each asset in the portfolio.
         """
+        self.delegate.setup(self)
         self.ef = self.efficient_frontier()
         risk_free_rate = (
             min(self.ef.expected_returns) if risk_free_rate is None else risk_free_rate

@@ -70,6 +70,7 @@ class BlackLitterman(GeneralOptimization):
     def get_weights(
         self, risk_free_rate=-0.05
     ):  # Risk free rate is set to -5% by default, which is the rate for the US Dollar during inflation
+        self.delegate.setup(self)
         bl = BlackLittermanModel(
             self.cov_matrix, pi=self.market_prior, absolute_views=self.views
         )

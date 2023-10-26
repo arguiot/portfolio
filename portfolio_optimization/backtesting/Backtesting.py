@@ -215,7 +215,9 @@ class Backtest:
         cagr = ((prices.iloc[-1] / prices.iloc[0]) ** (1 / (len(prices) / 365))) - 1
 
         letter_index = (
-            string.ascii_uppercase[df.columns.get_loc(name)] if is_asset is True else 0
+            string.ascii_uppercase[df.columns.get_loc(name) + df.shape[1] + 1]
+            if is_asset is True
+            else 0
         )
         key = (
             "'" + name + "'!C:C"
@@ -248,6 +250,7 @@ class Backtest:
                 "CAGR": cagr,
                 "Sharpe Ratio": sharpe_ratio_formula,
                 "Daily Volatility": volatility,
+                "90d Volatility": daily_return.rolling(90).std().iloc[-1],
                 "Annualized Volatility": annualized_volatility,
                 "Max Drawdown": max_dd,
                 "Calmar Ratio": calmar_ratio,
@@ -269,6 +272,11 @@ class Backtest:
         # Copy price_data and crop it to the start and end dates of the backtest
         price_data = self.price_data.copy()
         price_data = price_data.loc[self.start_date : self.end_date]
+        # Add all the daily returns to the price data
+        for asset in price_data.columns:
+            price_data[asset + " Daily Return"] = price_data[asset].pct_change()
+
+        price_data.sort_index(inplace=True)
 
         price_data.to_excel(writer, sheet_name="Price Data", index=True)
         writer.sheets["Price Data"].hide()
@@ -282,6 +290,7 @@ class Backtest:
                 "CAGR",
                 "Sharpe Ratio",
                 "Daily Volatility",
+                "90d Volatility",
                 "Annualized Volatility",
                 "Max Drawdown",
                 "Calmar Ratio",
@@ -392,7 +401,7 @@ class Backtest:
         # Use =INDIRECT("'"&INDEX(Overview!B1:H1,1,Overview!B10)&"'!A5:"&"C"&COUNTA(INDIRECT("'"&INDEX(Overview!B1:H1,1,Overview!B10)&"'!A:A")))
         writer.sheets["Chart Data"].write_dynamic_array_formula(
             "A1:A1",
-            f'=INDIRECT("\'"&Overview!B{overview_df.shape[0] + 6}&"\'!A5:"&"C"&COUNTA(INDIRECT("\'"&Overview!B{overview_df.shape[0] + 6}&"\'!A:A")))',
+            f'=INDIRECT("\'"&Overview!B{overview_df.shape[0] + 6}&"\'!A5:"&"C"&COUNTA(INDIRECT("\'"&Overview!B{overview_df.shape[0] + 6}&"\'!A:A"))+2)',
         )
 
         # Format A column as dates
@@ -406,8 +415,8 @@ class Backtest:
         chart.set_y_axis({"name": "Portfolio Value"})
         chart.add_series(
             {
-                "categories": "='Chart Data'!$A$1:$A$1000",
-                "values": "='Chart Data'!$B$1:$B$1000",
+                "categories": "='Chart Data'!$A:$A",
+                "values": "='Chart Data'!$B:$B",
                 "name": "=Overview!$B$13",
             }
         )

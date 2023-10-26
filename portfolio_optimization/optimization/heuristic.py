@@ -23,6 +23,7 @@ class Heuristic(GeneralOptimization):
         Returns:
             pd.Series: A pandas Series object containing the weights for the assets in the portfolio.
         """
+        self.delegate.setup(self)
         weights = pd.Series(name="Weights")
         partial_result = self.pre_processing(self.df)
         for asset in self.df.columns:

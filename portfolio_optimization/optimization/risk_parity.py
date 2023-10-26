@@ -41,6 +41,7 @@ class RiskParity(GeneralOptimization):
         self.latest_apy: pd.Series | None = None
 
     def get_weights(self):
+        self.delegate.setup(self)
         num_assets = self.df.shape[1]
         # Calculate budget
         # Normalizing the budget_target values to sum to the number of assets.

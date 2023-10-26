@@ -4,7 +4,7 @@ from portfolio_optimization.data_collection import *
 from datetime import timedelta
 from tokens.get_assets import *
 import numpy as np
-import copy
+from pypfopt import expected_returns
 import sys
 from portfolio_optimization.optimization.GeneralOptimization import (
     GeneralOptimizationDelegate,
@@ -29,7 +29,6 @@ from portfolio_optimization.portfolio.Portfolio import Portfolio
 from portfolio_optimization.portfolio.delegate import PortfolioDelegate
 from portfolio_optimization.portfolio.rebalancing import optimize_trades
 from portfolio_optimization.backtesting.Backtesting import Backtest
-from portfolio_optimization.portfolio.parity import optimal_strategy
 from dateutil.relativedelta import relativedelta
 from portfolio_optimization.portfolio.trade_generator import totalOrders, orderSize
 
@@ -58,25 +57,32 @@ class HeuristicRebalancingPortfolioDelegate(PortfolioDelegate):
         tbd = 0
         weight_assets = [
             (
-                target_weights[i],  # - 0.1 * target_weights[i],
-                target_weights[i],
-                target_weights[i],  # + 0.1 * target_weights[i]
+                target_weights[i]
+                if i in target_weights
+                else 0,  # - 0.1 * target_weights[i],
+                target_weights[i] if i in target_weights else 0,
+                target_weights[i]
+                if i in target_weights
+                else 0,  # + 0.1 * target_weights[i]
             )
-            for i in target_weights.index
+            for i in prices.index
         ]
-        order_size_assets = [(50, 1000) for i in target_weights.index]
+        order_size_assets = [(50, 1000) for i in prices.index]
+
+        _holdings = holdings.reindex(prices.index).fillna(0)
+        _prices = prices.reindex(prices.index).fillna(0)
 
         orders = totalOrders(
-            np.array(holdings),
-            np.array(prices),
+            np.array(_holdings),
+            np.array(_prices),
             np.array(order_size_assets),
             np.array(weight_assets),
             tbd,
         )
 
         sizes = orderSize(
-            np.array(holdings),
-            np.array(prices),
+            np.array(_holdings),
+            np.array(_prices),
             np.array(order_size_assets),
             np.array(weight_assets),
             tbd,
@@ -84,15 +90,24 @@ class HeuristicRebalancingPortfolioDelegate(PortfolioDelegate):
 
         trades = orders * sizes
 
-        return holdings + trades / prices
+        return _holdings + trades / prices
 
 
 class CustomMarkowitzDelegate(GeneralOptimizationDelegate):
     def setup(self, optimization_object: Markowitz):
+        print("Setting up Markowitz")
         optimization_object.mode = optimization_object.CovMode.LEDOIT_WOLF
         optimization_object.efficient_portfolio = (
             optimization_object.EfficientPortfolio.MAX_SHARPE
         )
+
+        if optimization_object.cov_matrix is None:
+            optimization_object.cov_matrix = optimization_object.get_cov_matrix()
+
+        optimization_object.rets = expected_returns.mean_historical_return(
+            optimization_object.df
+        )
+
         return super().setup(optimization_object)
 
 
@@ -410,6 +425,6 @@ if __name__ == "__main__":
                     progress_logger=logger,
                 )
             )
-        parity_weights = optimal_strategy(perfs)
+        # parity_weights = optimal_strategy(perfs)
         print(parity_weights)
     progress_logger.delete()

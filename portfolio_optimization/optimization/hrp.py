@@ -112,6 +112,7 @@ class HRPOptimization(GeneralOptimization):
             a pandas DataFrame containing the optimized and cleaned portfolio weights
 
         """
+        self.delegate.setup(self)
         self.optimize()
         # self.clean_weights()
         return self.weights
