@@ -2,6 +2,7 @@ from enum import Enum
 from .GeneralOptimization import GeneralOptimization
 from pypfopt.risk_models import risk_matrix
 from pypfopt.efficient_frontier import EfficientFrontier
+from pypfopt import expected_returns
 from pypfopt import plotting
 import matplotlib.pyplot as plt
 import numpy as np
@@ -75,6 +76,12 @@ class Markowitz(GeneralOptimization):
             A pandas Series object containing the optimized weights for each asset in the portfolio.
         """
         self.delegate.setup(self)
+        if self.cov_matrix is None:
+            self.cov_matrix = self.get_cov_matrix()
+        if self.rets is None:
+            self.rets = expected_returns.mean_historical_return(
+                self.df, log_returns=True
+            )
         self.ef = self.efficient_frontier()
         risk_free_rate = (
             min(self.ef.expected_returns) if risk_free_rate is None else risk_free_rate

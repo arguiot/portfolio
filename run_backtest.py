@@ -27,7 +27,11 @@ from portfolio_optimization.utils import ProgressLogger
 
 from portfolio_optimization.portfolio.Portfolio import Portfolio
 from portfolio_optimization.portfolio.delegate import PortfolioDelegate
-from portfolio_optimization.portfolio.rebalancing import optimize_trades
+from portfolio_optimization.portfolio.rebalancing import (
+    optimize_trades,
+    deterministic_optimal_rebalancing,
+)
+from portfolio_optimization.backtesting.parity import ParityBacktestingProcessor
 from portfolio_optimization.backtesting.Backtesting import Backtest
 from dateutil.relativedelta import relativedelta
 from portfolio_optimization.portfolio.trade_generator import totalOrders, orderSize
@@ -37,7 +41,7 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
     def rebalance(
         self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
     ) -> pd.Series:
-        diff = optimize_trades(
+        diff = deterministic_optimal_rebalancing(
             holdings=holdings,
             new_target_weights=target_weights,
             prices=prices,
@@ -169,7 +173,9 @@ def create_portfolios(
 
     initial_bid = 1000
 
-    chosen_delegate = HeuristicRebalancingPortfolioDelegate()
+    chosen_delegate = (
+        OptRebalancingPortfolioDelegate()
+    )  # Or HeuristicRebalancingPortfolioDelegate()
 
     porfolio_hrp = Portfolio(
         base_value=initial_bid,
@@ -418,13 +424,26 @@ if __name__ == "__main__":
         for backtest in backtests:
             asset_class = backtest.asset_class
             logger = loggers[backtests.index(backtest)]
-            perfs.append(
-                run_for_asset_class(
-                    backtest=backtest,
-                    rebalance_frequency=rebalance_frequency,
-                    progress_logger=logger,
-                )
+            results = run_for_asset_class(
+                backtest=backtest,
+                rebalance_frequency=rebalance_frequency,
+                progress_logger=logger,
             )
-        # parity_weights = optimal_strategy(perfs)
-        print(parity_weights)
+            # Get the 'Risk Parity' portfolio, so first where .name == 'Risk Parity'
+            risk_parity = next(
+                result for result in results if result.name == "Risk Parity"
+            )
+            perfs.append(risk_parity)
+
+        parity_processor = ParityBacktestingProcessor(
+            perfs[0],
+            perfs[1],
+            perfs[2],
+        )
+
+        parity_perf = parity_processor.backtest()
+        backtests[0].price_data = parity_processor.price_data()
+        backtests[0].export_results(
+            performances=[parity_perf], folder_path=f"./out/{rebalance_frequency}"
+        )
     progress_logger.delete()

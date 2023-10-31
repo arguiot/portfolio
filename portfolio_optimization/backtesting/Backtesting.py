@@ -10,6 +10,8 @@ from ..portfolio.Portfolio import Portfolio
 
 from typing import Dict, List
 from pandas.core.frame import DataFrame, Series
+from .delegate import BacktestingDelegate
+from datetime import datetime
 
 
 class PortfolioPerformance:
@@ -39,6 +41,25 @@ class PortfolioPerformance:
             )
         return decomposed
 
+    def up_to(self, end_date: datetime | None = None):
+        """
+        Returns a copy of the PortfolioPerformance object up to the specified end date.
+        """
+        if end_date is None:
+            return self
+        end_date = pd.to_datetime(end_date)
+        return PortfolioPerformance(
+            self.name,
+            self.portfolio_value.loc[:end_date],
+            self.rebalance_dates[self.rebalance_dates <= end_date],
+            self.portfolio_compositions.loc[:end_date],
+            self.portfolio_raw_composition.loc[:end_date],
+            self.portfolio_holdings.loc[:end_date],
+            self.portfolio_metrics.loc[:end_date]
+            if self.portfolio_metrics is not None
+            else None,
+        )
+
 
 class Backtest:
     def __init__(
@@ -54,6 +75,7 @@ class Backtest:
         asset_class=None,
         progress_logger=None,
     ):
+        self.delegate = BacktestingDelegate()
         self.asset_class = asset_class
         self.price_data = (
             get_historical_prices_for_assets(
@@ -139,6 +161,7 @@ class Backtest:
                 self.portfolio_raw_composition[name].loc[date] = portfolio.raw_weights
                 self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
             self.portfolio_holdings[name].loc[date] = portfolio.holdings
+            self.delegate.post_process(self, portfolio, date)
         progress_logger.end_task(name) if progress_logger is not None else None
 
         return PortfolioPerformance(
@@ -211,7 +234,11 @@ class Backtest:
 
         average_daily_return = daily_return.mean()
         average_monthly_return = ((1 + average_daily_return) ** 30) - 1
-        apy = ((1 + average_daily_return) ** 365) - 1
+        # APY is total return, divided by the number of years, plus 1, raised to the power of 1 divided by the number of years, minus 1
+        start_date = prices.index[0]
+        end_date = prices.index[-1]
+        years = (end_date - start_date).days / 365
+        apy = ((1 + total_return) ** (1 / years)) - 1
         cagr = ((prices.iloc[-1] / prices.iloc[0]) ** (1 / (len(prices) / 365))) - 1
 
         letter_index = (
@@ -275,6 +302,9 @@ class Backtest:
         # Add all the daily returns to the price data
         for asset in price_data.columns:
             price_data[asset + " Daily Return"] = price_data[asset].pct_change()
+            # Add market cap if available
+            if self.mcaps is not None and asset in self.mcaps.columns:
+                price_data[asset + " Market Cap"] = self.mcaps[asset]
 
         price_data.sort_index(inplace=True)
 
