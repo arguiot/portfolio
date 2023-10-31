@@ -205,42 +205,40 @@ class ParityBacktestingProcessor:
                         self.portfolio_g.up_to(current_date),
                     )
 
-                    # Convert the ParityLine to weights
-                    _return = self.parity_line.getMinReturn()
-                    print(f"Min Return: {_return}")
-                    weights = self.parity_line.convertReturn(_return)[1:]
-                    weights = pd.Series(weights)
-                    assert sum(weights) == 1, f"Weights do not sum to 1: {sum(weights)}"
-                    print(f"Weights: {weights}")
-                    self.weights.loc[current_date] = weights
+                # Convert the ParityLine to weights
+                _return = self.parity_line.getMinReturn()
+                print(f"Min Return: {_return}")
+                weights = self.parity_line.convertReturn(_return)[1:]
+                weights = pd.Series(weights)
+                assert sum(weights) == 1, f"Weights do not sum to 1: {sum(weights)}"
+                print(f"Weights: {weights}")
+                self.weights.loc[current_date] = weights
 
-                    # Convert the weights to holdings
-                    # Last value of the portfolio
-                    last_value = (
-                        self.values.iloc[-1]["Portfolio Value"]
-                        if len(self.values) > 0
-                        else initial_cash
-                    )
-                    if last_value == 0 or np.isnan(last_value):
-                        last_value = initial_cash
-                    # Allocate the cash to each portfolio
-                    self.holdings.loc[current_date] = last_value * weights
-                    # Update the portfolio value based on the current prices
-                    _value = (
-                        self.portfolio_a.portfolio_value.loc[current_date] * weights[0]
-                        + self.portfolio_b.portfolio_value.loc[current_date]
-                        * weights[1]
-                        + self.portfolio_g.portfolio_value.loc[current_date]
-                        * weights[2]
-                    )
+                # Convert the weights to holdings
+                # Last value of the portfolio
+                last_value = (
+                    self.values.iloc[-1]["Portfolio Value"]
+                    if len(self.values) > 0
+                    else initial_cash
+                )
+                if last_value == 0 or np.isnan(last_value):
+                    last_value = initial_cash
+                # Allocate the cash to each portfolio
+                self.holdings.loc[current_date] = last_value * weights
+                # Update the portfolio value based on the current prices
+                _value = (
+                    self.portfolio_a.portfolio_value.loc[current_date] * weights[0]
+                    + self.portfolio_b.portfolio_value.loc[current_date] * weights[1]
+                    + self.portfolio_g.portfolio_value.loc[current_date] * weights[2]
+                )
 
-                    print(f"Value: {_value}")
+                print(f"Value: {_value}")
 
-                    self.values.loc[current_date] = _value
-                    # Debug, we want last value, weights and holdings to be printed
-                    print(
-                        f"Last Value: {last_value}, Weights: {weights}, Holdings: {self.holdings.loc[current_date]}"
-                    )
+                self.values.loc[current_date] = _value
+                # Debug, we want last value, weights and holdings to be printed
+                print(
+                    f"Last Value: {last_value}, Weights: {weights}, Holdings: {self.holdings.loc[current_date]}"
+                )
 
             except AssertionError as e:
                 import traceback
