@@ -33,6 +33,10 @@ from portfolio_optimization.portfolio.rebalancing import (
 )
 from portfolio_optimization.backtesting.parity import ParityBacktestingProcessor
 from portfolio_optimization.backtesting.Backtesting import Backtest
+from portfolio_optimization.backtesting.parity import (
+    ParityProcessorDelegate,
+    ParityLine,
+)
 from dateutil.relativedelta import relativedelta
 from portfolio_optimization.portfolio.trade_generator import totalOrders, orderSize
 
@@ -113,6 +117,14 @@ class CustomMarkowitzDelegate(GeneralOptimizationDelegate):
         )
 
         return super().setup(optimization_object)
+
+
+class CustomParityDelegate(ParityProcessorDelegate):
+    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        _return = parity_line.getMaxReturn()
+        print(f"Max Return: {_return}")
+        weights = parity_line.convertReturn(_return)[1:]
+        return pd.Series(weights)
 
 
 def create_portfolios(
@@ -440,10 +452,12 @@ if __name__ == "__main__":
             perfs[1],
             perfs[2],
         )
-
-        parity_perf = parity_processor.backtest()
+        parity_processor.delegate = CustomParityDelegate()
+        parity_perf = parity_processor.backtest(initial_cash=1000)
         backtests[0].price_data = parity_processor.price_data()
         backtests[0].export_results(
-            performances=[parity_perf], folder_path=f"./out/{rebalance_frequency}"
+            performances=[parity_perf],
+            folder_path=f"./out/{rebalance_frequency}",
+            file_name="parity.xlsx",
         )
     progress_logger.delete()

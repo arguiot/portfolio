@@ -241,11 +241,30 @@ class Backtest:
         apy = ((1 + total_return) ** (1 / years)) - 1
         cagr = ((prices.iloc[-1] / prices.iloc[0]) ** (1 / (len(prices) / 365))) - 1
 
-        letter_index = (
-            string.ascii_uppercase[df.columns.get_loc(name) + df.shape[1] + 1]
-            if is_asset is True
-            else 0
-        )
+        # Convert to DataFrame if df is a pd.Series
+        if is_asset is True:
+            if isinstance(df, pd.Series):
+                df = df.to_frame()
+
+            columns = df.columns.to_list()
+            # Find name in the columns and get the letter index
+            try:
+                column_index = columns.index(name)
+            except ValueError:
+                print(
+                    f"Could not find {name} in the columns of the dataframe. Here are the columns: {columns}"
+                )
+                raise ValueError
+            if column_index < 26:
+                letter_index = string.ascii_uppercase[column_index]
+            else:
+                quotient, remainder = divmod(column_index, 26)
+                letter_index = (
+                    string.ascii_uppercase[quotient - 1]
+                    + string.ascii_uppercase[remainder]
+                )
+        else:
+            letter_index = 0
         key = (
             "'" + name + "'!C:C"
             if not is_asset

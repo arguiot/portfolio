@@ -160,6 +160,8 @@ class ParityBacktestingProcessor:
         self.values = pd.DataFrame(columns=["Portfolio Value"])
         self.holdings = pd.Series(name="Holdings")
 
+        self.delegate = ParityProcessorDelegate()
+
     def rebalance_line(self, up_to: datetime | None = None):
         assert self.portfolio_a is not None
         assert self.portfolio_b is not None
@@ -206,10 +208,7 @@ class ParityBacktestingProcessor:
                     )
 
                 # Convert the ParityLine to weights
-                _return = self.parity_line.getMinReturn()
-                print(f"Min Return: {_return}")
-                weights = self.parity_line.convertReturn(_return)[1:]
-                weights = pd.Series(weights)
+                weights = self.delegate.compute_weights(self.parity_line)
                 assert sum(weights) == 1, f"Weights do not sum to 1: {sum(weights)}"
                 print(f"Weights: {weights}")
                 self.weights.loc[current_date] = weights
@@ -226,6 +225,16 @@ class ParityBacktestingProcessor:
                 # Allocate the cash to each portfolio
                 self.holdings.loc[current_date] = last_value * weights
                 # Update the portfolio value based on the current prices
+                print(f"Date: {current_date}")
+                print(
+                    f"Portfolio A: {self.portfolio_a.portfolio_value.loc[current_date]}"
+                )
+                print(
+                    f"Portfolio B: {self.portfolio_b.portfolio_value.loc[current_date]}"
+                )
+                print(
+                    f"Portfolio G: {self.portfolio_g.portfolio_value.loc[current_date]}"
+                )
                 _value = (
                     self.portfolio_a.portfolio_value.loc[current_date] * weights[0]
                     + self.portfolio_b.portfolio_value.loc[current_date] * weights[1]
@@ -264,3 +273,11 @@ class ParityBacktestingProcessor:
         price_data["Beta"] = self.portfolio_b.portfolio_value["Portfolio Value"]
         price_data["Gamma"] = self.portfolio_g.portfolio_value["Portfolio Value"]
         return price_data
+
+
+class ParityProcessorDelegate:
+    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        _return = parity_line.getMinReturn()
+        print(f"Min Return: {_return}")
+        weights = parity_line.convertReturn(_return)[1:]
+        return pd.Series(weights)
