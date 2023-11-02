@@ -194,6 +194,8 @@ class ParityBacktestingProcessor:
             self.portfolio_g.portfolio_value.index[-1],
         )
 
+        self.values.loc[start_date] = initial_cash
+
         current_date = start_date + timedelta(days=1)
         while current_date <= end_date:
             try:
