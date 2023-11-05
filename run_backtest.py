@@ -49,8 +49,8 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
             holdings=holdings,
             new_target_weights=target_weights,
             prices=prices,
-            min_W=0.0,
-            max_W=1.0,
+            min_W=target_weights * 0.9,
+            max_W=target_weights * 1.1,
             external_movement=0,
         )
 

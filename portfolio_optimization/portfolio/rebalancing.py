@@ -165,28 +165,62 @@ def deterministic_optimal_rebalancing(
     if cash_to_add > 0:
         # We need to add cash to the biggest position, if this doesn't violate the max_W constraint. Otherwise, we add cash to the second biggest position, and so on.
         idx = 0
-        while cash_to_add > 0:
+        while cash_to_add > 0 and idx < len(deviation):
             asset = deviation.index[idx]
-            if current_weights[asset] + cash_to_add / prices[asset] <= max_W[asset]:
-                trades[asset] += cash_to_add / prices[asset]
-                cash_to_add = 0
-            else:
-                idx += 1
+            potential_trade_value = (
+                cash_to_add  # this is the value of tokens we can buy
+            )
+            potential_trade = (
+                potential_trade_value / prices[asset]
+            )  # this is the number of tokens we can buy
+            if (
+                current_weights[asset]
+                + (potential_trade * prices[asset] / portfolio_value)
+                > max_W[asset]
+            ):
+                # We can't add the full potential trade, so we add as much as we can
+                potential_trade = (
+                    (max_W[asset] - current_weights[asset])
+                    * portfolio_value
+                    / prices[asset]
+                )
+            trades[asset] += potential_trade
+            cash_to_add -= potential_trade * prices[asset]
+            idx += 1
 
     elif cash_to_add < 0:
         # We need to subtract cash from the smallest position, if this doesn't violate the min_W constraint. Otherwise, we subtract cash from the second smallest position, and so on.
         idx = 0
-        while cash_to_add < 0:
+        while cash_to_add < 0 and idx < len(deviation):
             asset = deviation.index[idx]
-            if current_weights[asset] + cash_to_add / prices[asset] >= min_W[asset]:
-                trades[asset] += cash_to_add / prices[asset]
-                cash_to_add = 0
-            else:
-                idx += 1
+            potential_trade_value = (
+                cash_to_add  # this is the value of tokens we can sell
+            )
+            potential_trade = potential_trade_value / prices[asset]
+            if (
+                current_weights[asset]
+                - (potential_trade * prices[asset] / portfolio_value)
+                < min_W[asset]
+            ):
+                # We can't subtract the full potential trade, so we subtract as much as we can
+                potential_trade = (
+                    (current_weights[asset] - min_W[asset])
+                    * portfolio_value
+                    / prices[asset]
+                )
+            trades[asset] += potential_trade
+            cash_to_add -= potential_trade * prices[asset]
+            idx += 1
 
     total_trade_value = (trades * prices).sum()
-    assert np.isclose(
-        total_trade_value, external_movement, atol=1e-8
-    ), f"The total trade value is not the same as the external movement. Total trade value: {total_trade_value}, external movement: {external_movement}. Trades: {trades * prices}"
+    if not np.isclose(total_trade_value, external_movement, atol=1e-8):
+        print(
+            f"The total trade value is not the same as the external movement. Total trade value: {total_trade_value}, external movement: {external_movement}. Trades: {trades * prices}"
+        )
+        # Then, we just rebalance to optimal weights, super straightforward
+        new_holdings = (
+            new_target_weights * (portfolio_value + external_movement) / prices
+        )
+        trades = new_holdings - holdings
 
     return trades

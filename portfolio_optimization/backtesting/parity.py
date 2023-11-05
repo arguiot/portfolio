@@ -5,6 +5,7 @@ import pandas as pd
 from portfolio_optimization.backtesting import Backtest
 from portfolio_optimization.portfolio import Portfolio
 from .Backtesting import PortfolioPerformance
+from ..optimization.risk_parity import RiskParity
 from .delegate import BacktestingDelegate
 
 
@@ -28,15 +29,41 @@ class ParityLine:
         portfolio_g: PortfolioPerformance,
     ):
         # Combine a and b
-        # TODO: Change to average annualized return
+        # Compute weight A and B, using risk parity
+        rp = RiskParity(
+            df=pd.concat(
+                [
+                    portfolio_a.portfolio_value["Portfolio Value"],
+                    portfolio_b.portfolio_value["Portfolio Value"],
+                ],
+                axis=1,
+            )
+        )
+        _weights = rp.get_weights()
+        self.weight_A = _weights.iloc[0]
+        self.weight_B = _weights.iloc[1]
+        # Calculate the average annualized return (APY)
+        start_date_a = portfolio_a.portfolio_value["Portfolio Value"].index[0]
+        end_date_a = portfolio_a.portfolio_value["Portfolio Value"].index[-1]
+        years_a = (end_date_a - start_date_a).days / 365
         self.r_a = (
-            portfolio_a.portfolio_value["Portfolio Value"].iloc[-1]
-            / portfolio_a.portfolio_value["Portfolio Value"].iloc[0]
-        )
+            (
+                portfolio_a.portfolio_value["Portfolio Value"].iloc[-1]
+                / portfolio_a.portfolio_value["Portfolio Value"].iloc[0]
+            )
+            ** (1 / years_a)
+        ) - 1
+
+        start_date_b = portfolio_b.portfolio_value["Portfolio Value"].index[0]
+        end_date_b = portfolio_b.portfolio_value["Portfolio Value"].index[-1]
+        years_b = (end_date_b - start_date_b).days / 365
         self.r_b = (
-            portfolio_b.portfolio_value["Portfolio Value"].iloc[-1]
-            / portfolio_b.portfolio_value["Portfolio Value"].iloc[0]
-        )
+            (
+                portfolio_b.portfolio_value["Portfolio Value"].iloc[-1]
+                / portfolio_b.portfolio_value["Portfolio Value"].iloc[0]
+            )
+            ** (1 / years_b)
+        ) - 1
         self.sigma_a = portfolio_a.portfolio_value["Portfolio Value"].pct_change().std()
         self.sigma_b = portfolio_b.portfolio_value["Portfolio Value"].pct_change().std()
 
@@ -44,10 +71,16 @@ class ParityLine:
         risk_ab = self.weight_A * self.sigma_a + self.weight_B * self.sigma_b
 
         # Linear regression on AB and G
+        start_date_c = portfolio_g.portfolio_value["Portfolio Value"].index[0]
+        end_date_c = portfolio_g.portfolio_value["Portfolio Value"].index[-1]
+        years_c = (end_date_c - start_date_c).days / 365
         self.r_c = (
-            portfolio_g.portfolio_value["Portfolio Value"].iloc[-1]
-            / portfolio_g.portfolio_value["Portfolio Value"].iloc[0]
-        )
+            (
+                portfolio_g.portfolio_value["Portfolio Value"].iloc[-1]
+                / portfolio_g.portfolio_value["Portfolio Value"].iloc[0]
+            )
+            ** (1 / years_c)
+        ) - 1
         self.sigma_c = portfolio_g.portfolio_value["Portfolio Value"].pct_change().std()
 
         # Risk is x, return is y, we need to find a and b such that y = ax + b
@@ -162,8 +195,6 @@ class ParityBacktestingProcessor:
         self.holdings = pd.Series(name="Holdings")
 
         self.delegate = ParityProcessorDelegate()
-
-        # TODO: Alpha - Beta: Risk Parity
 
     def rebalance_line(self, up_to: datetime | None = None):
         assert self.portfolio_a is not None
