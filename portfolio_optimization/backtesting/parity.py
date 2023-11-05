@@ -28,6 +28,7 @@ class ParityLine:
         portfolio_g: PortfolioPerformance,
     ):
         # Combine a and b
+        # TODO: Change to average annualized return
         self.r_a = (
             portfolio_a.portfolio_value["Portfolio Value"].iloc[-1]
             / portfolio_a.portfolio_value["Portfolio Value"].iloc[0]
@@ -161,6 +162,8 @@ class ParityBacktestingProcessor:
         self.holdings = pd.Series(name="Holdings")
 
         self.delegate = ParityProcessorDelegate()
+
+        # TODO: Alpha - Beta: Risk Parity
 
     def rebalance_line(self, up_to: datetime | None = None):
         assert self.portfolio_a is not None

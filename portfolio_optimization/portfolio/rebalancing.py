@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import cvxpy as cp
+from math import ceil
 
 
 def optimize_trades(
@@ -47,7 +48,7 @@ def optimize_trades(
 
     objective = cp.Minimize(
         cp.sum_squares(new_weights - new_target_weights.values)
-        # + cp.sum_squares(new_holdings - holdings.values)
+        + cp.sum_squares(new_holdings - holdings.values)
     )
 
     problem = cp.Problem(objective, constraints)
@@ -92,54 +93,100 @@ def deterministic_optimal_rebalancing(
     if not isinstance(max_W, float):
         max_W = max_W.reindex(shared_index)
 
-    # Calculate current portfolio value and weights
-    current_portfolio_value = (holdings * prices).sum()
-    current_weights = (holdings * prices) / current_portfolio_value
+    # Calculate current portfolio value and current weights of assets
+    portfolio_value = (prices * holdings).sum()
+    current_weights = (prices * holdings) / (portfolio_value + external_movement)
 
-    # Find overweight assets and adjust them to target, calculating cash surplus
-    cash_surplus = 0
-    for asset in shared_index:
-        if isinstance(max_W, float):
-            max_W_asset = max_W
-        else:
-            max_W_asset = max_W[asset]
-        if current_weights[asset] > max_W_asset:
-            cost_to_adjust = (
-                current_weights[asset] - new_target_weights[asset]
-            ) * current_portfolio_value
-            cash_surplus += cost_to_adjust
-            holdings[asset] -= cost_to_adjust / prices[asset]
+    trades = pd.Series(index=shared_index, data=0)
 
-    # Update cash surplus based on external movement
-    cash_surplus += external_movement
+    # Step 0: Sort by deviation from target weights
+    deviation = current_weights - new_target_weights
+    deviation = deviation.sort_values(ascending=False)
 
-    # Calculate current weights
-    current_portfolio_value = (holdings * prices).sum()
-    current_weights = (holdings * prices) / current_portfolio_value
+    # Step 1: Find and handle overweight assets
+    overweight_assets = current_weights > max_W
+    overweight_adjustments = (
+        current_weights[overweight_assets] - new_target_weights[overweight_assets]
+    ) * (portfolio_value + external_movement)
+    cash_from_selling = overweight_adjustments.sum()
+    trades[overweight_assets] -= overweight_adjustments / prices
 
-    # Sort underweight assets by deviation from minimum weight
-    underweight_assets = {
-        asset: min_W[asset] - current_weights[asset]
-        if not isinstance(min_W, float)
-        else min_W - current_weights[asset]
-        for asset in shared_index
-        if current_weights[asset]
-        < (min_W[asset] if not isinstance(min_W, float) else min_W)
-    }
-    underweight_assets = dict(
-        sorted(underweight_assets.items(), key=lambda item: item[1], reverse=True)
+    # Step 2: Add/subtract cash flow from overweight assets
+    total_cash = cash_from_selling + external_movement
+
+    # Step 3: Handle negative cash flow
+    if total_cash < 0:
+        other_assets = current_weights <= max_W
+        excess_weights = (
+            current_weights[other_assets] - new_target_weights[other_assets]
+        )
+        excess_weights_assets = excess_weights.sort_values(ascending=False).index
+        for asset in excess_weights_assets:
+            cash_needed = excess_weights[asset] * portfolio_value
+            if (cash_needed + total_cash) < 0:
+                # We need to sell this asset
+                trades[asset] -= cash_needed / prices[asset]
+                total_cash += cash_needed
+            else:
+                # We only partially sell this asset and break the loop
+                trades[asset] += total_cash / prices[asset]
+                total_cash = 0  # Update total_cash to 0 after partial sell
+                break
+
+    # Step 4: Handle underweight assets
+    underweight_assets = current_weights < min_W
+    deficit_weights = (
+        new_target_weights[underweight_assets] - current_weights[underweight_assets]
     )
-
-    # Allocate cash surplus to underweight assets until no more cash or all assets at minimum weight
-    for asset, weight_diff in underweight_assets.items():
-        cash_needed = weight_diff * current_portfolio_value
-        cash_to_allocate = min(cash_needed, cash_surplus)
-        holdings[asset] += cash_to_allocate / prices[asset]
-        cash_surplus -= cash_to_allocate
-
-        if cash_surplus <= 0:
+    deficit_weights_assets = deficit_weights.sort_values().index[::-1]
+    for asset in deficit_weights_assets:
+        cash_needed = deficit_weights[asset] * (portfolio_value + external_movement)
+        if (cash_needed - total_cash) < 0:
+            # We need to buy this asset
+            trades[asset] += cash_needed / prices[asset]
+            total_cash -= cash_needed
+        else:
+            # We only partially buy this asset and break the loop
+            trades[asset] += total_cash / prices[asset]
+            total_cash = 0  # Update total_cash to 0 after partial buy
             break
 
-    # Calculate difference in asset holdings
-    diff = holdings - holdings.values
-    return diff
+    # Step 5: Check the cash flow
+    start_cash = (prices * holdings).sum() + external_movement
+    end_cash = (prices * (holdings + trades)).sum()
+
+    # Update deviation after trades
+    current_weights = (prices * (holdings + trades)) / end_cash
+    deviation = current_weights - new_target_weights
+    cash_to_add = start_cash - end_cash
+
+    deviation = deviation.sort_values(ascending=False)
+
+    if cash_to_add > 0:
+        # We need to add cash to the biggest position, if this doesn't violate the max_W constraint. Otherwise, we add cash to the second biggest position, and so on.
+        idx = 0
+        while cash_to_add > 0:
+            asset = deviation.index[idx]
+            if current_weights[asset] + cash_to_add / prices[asset] <= max_W[asset]:
+                trades[asset] += cash_to_add / prices[asset]
+                cash_to_add = 0
+            else:
+                idx += 1
+
+    elif cash_to_add < 0:
+        # We need to subtract cash from the smallest position, if this doesn't violate the min_W constraint. Otherwise, we subtract cash from the second smallest position, and so on.
+        idx = 0
+        while cash_to_add < 0:
+            asset = deviation.index[idx]
+            if current_weights[asset] + cash_to_add / prices[asset] >= min_W[asset]:
+                trades[asset] += cash_to_add / prices[asset]
+                cash_to_add = 0
+            else:
+                idx += 1
+
+    total_trade_value = (trades * prices).sum()
+    assert np.isclose(
+        total_trade_value, external_movement, atol=1e-8
+    ), f"The total trade value is not the same as the external movement. Total trade value: {total_trade_value}, external movement: {external_movement}. Trades: {trades * prices}"
+
+    return trades

@@ -17,7 +17,6 @@ class Portfolio:
         mcaps: pd.Series | pd.DataFrame | None = None,
         max_weight: float | Dict[str, float] = 1.0,
         min_weight: float | Dict[str, float] = 0.0,
-        weight_threshold: float = 0.01,
         **kwargs,  # For additional parameters for the optimiser
     ):
         self.optimiser = optimiser
@@ -28,7 +27,6 @@ class Portfolio:
         current_prices = initial_prices.iloc[-1]
         self.max_weight = max_weight
         self.min_weight = min_weight
-        self.weight_threshold = weight_threshold
         self.kwargs = kwargs
         self.latest_apy: pd.Series | None = None
         self.base_value = base_value
@@ -203,7 +201,8 @@ class Portfolio:
         """
         if not hasattr(self, "holdings"):
             return self.weights
-        self.holdings = self.weights * self.value(prices) / prices
+
+        self.delegate.rebalance(self.holdings, prices, self.weights)
         return self.weights
 
     def value(self, prices: pd.Series):

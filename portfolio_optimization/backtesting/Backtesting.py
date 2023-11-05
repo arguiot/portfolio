@@ -249,16 +249,16 @@ class Backtest:
             columns = df.columns.to_list()
             # Find name in the columns and get the letter index
             try:
-                column_index = columns.index(name)
+                column_index = columns.index(name) + len(columns)
             except ValueError:
                 print(
                     f"Could not find {name} in the columns of the dataframe. Here are the columns: {columns}"
                 )
                 raise ValueError
-            if column_index < 26:
-                letter_index = string.ascii_uppercase[column_index]
+            if (column_index + 1) < 26:
+                letter_index = string.ascii_uppercase[column_index + 1]
             else:
-                quotient, remainder = divmod(column_index, 26)
+                quotient, remainder = divmod(column_index + 1, 26)
                 letter_index = (
                     string.ascii_uppercase[quotient - 1]
                     + string.ascii_uppercase[remainder]
@@ -394,6 +394,20 @@ class Backtest:
             startcol += 5 + compositions_df.shape[1]
             sheet.write(2, startcol, "Portfolio Composition")
             holdings__df.to_excel(
+                writer, sheet_name=performance.name, startrow=3, startcol=startcol
+            )
+
+            # Based on holdings__df and price_data, write the "Live Weight" column. Live weight is the basically the holding * price / portfolio value.
+            live_weight = holdings__df.copy()
+            for asset in live_weight.columns:
+                if asset not in price_data.columns:
+                    continue
+                live_weight[asset] = (
+                    live_weight[asset] * price_data[asset] / value["Portfolio Value"]
+                )
+            startcol += 5 + holdings__df.shape[1]
+            sheet.write(2, startcol, "Live Weight")
+            live_weight.to_excel(
                 writer, sheet_name=performance.name, startrow=3, startcol=startcol
             )
 

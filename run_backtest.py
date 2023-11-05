@@ -174,15 +174,6 @@ def create_portfolios(
     elif asset_class == "low_risk_tickers":
         budget = {}
 
-    weight_threshold = 0.01
-
-    if asset_class == "high_risk_tickers":
-        weight_threshold = 0.05
-    elif asset_class == "medium_risk_tickers":
-        weight_threshold = 0.03
-    elif asset_class == "low_risk_tickers":
-        weight_threshold = 0.01
-
     initial_bid = 1000
 
     chosen_delegate = (
@@ -195,7 +186,6 @@ def create_portfolios(
         optimiser=HRPOptimization,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     porfolio_hrp.delegate = chosen_delegate
@@ -206,7 +196,6 @@ def create_portfolios(
         optimiser=Markowitz.bind(CustomMarkowitzDelegate()),
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_markowitz.delegate = chosen_delegate
@@ -218,7 +207,6 @@ def create_portfolios(
         mcaps=mcaps.loc[start_date_portfolio],
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_bl.delegate = chosen_delegate
@@ -229,7 +217,6 @@ def create_portfolios(
         optimiser=RiskParity,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
         budget=budget,
         lambda_var=0.1,
         lambda_u=0.1,
@@ -243,7 +230,6 @@ def create_portfolios(
         optimiser=FastRiskParity,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_fast_parity.delegate = chosen_delegate
@@ -254,7 +240,6 @@ def create_portfolios(
         optimiser=Heuristic,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_default.delegate = chosen_delegate
@@ -265,7 +250,6 @@ def create_portfolios(
         optimiser=RewardToRisk,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_rtr.delegate = chosen_delegate
@@ -275,7 +259,6 @@ def create_portfolios(
         initial_prices=df.loc[:start_date_portfolio],
         optimiser=SimpleVolatility,
         max_weight=max_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_vo.delegate = chosen_delegate
@@ -286,7 +269,6 @@ def create_portfolios(
         optimiser=VolatilityOfVolatility,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_vov.delegate = chosen_delegate
@@ -297,7 +279,6 @@ def create_portfolios(
         optimiser=ValueAtRisk,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_var.delegate = chosen_delegate
@@ -308,7 +289,6 @@ def create_portfolios(
         optimiser=RewardToVaR,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_rvar.delegate = chosen_delegate
@@ -319,7 +299,6 @@ def create_portfolios(
         optimiser=Combination,
         max_weight=max_weight,
         min_weight=min_weight,
-        weight_threshold=weight_threshold,
     )
 
     portfolio_combination.delegate = chosen_delegate
