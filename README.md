@@ -47,14 +47,8 @@ Where `<PERIOD>` should be replaced with the desired frequency (for example,
 > Make sure you have Python 3.10 or higher installed on your system. Also, make
 > sure you have cloned the repository, with submodules!
 
-First, install the required Python packages:
-
-```shell
-pip install -r requirements.txt
-```
-
-Make sure you have CLang installed on your system. If not, you can install it
-using the following command:
+First, make sure you have CLang installed on your system. If not, you can
+install it using the following command:
 
 For macOS:
 
@@ -71,7 +65,13 @@ sudo apt-get install clang
 Then, run the setup script:
 
 ```shell
-pip install .
+pip install -e .
+```
+
+Then, install the required Python packages:
+
+```shell
+pip install -r requirements.txt
 ```
 
 Finally, install Bun:
