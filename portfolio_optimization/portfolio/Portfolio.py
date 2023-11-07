@@ -141,16 +141,22 @@ class Portfolio:
         real_weights = self.get_current_weights(current_prices)
         self.weights = new_weights
 
-        assert np.isclose(self.weights.sum(), 1, 0.01), (
+        assert np.isclose(self.weights.sum(), 1, 0.0001), (
             f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
         )
 
         if not hasattr(self, "holdings"):
             self.holdings = base_value * self.weights / current_prices
 
-        self.holdings = self.delegate.rebalance(
+        new_holdings = self.delegate.rebalance(
             self.holdings, current_prices, self.weights
         )
+
+        # Check that the value of the portfolio is the same as the base value
+        assert np.isclose(
+            (new_holdings * current_prices).sum(), base_value, 0.01
+        ), f"The new holdings value ({(new_holdings * current_prices).sum()}) does not match projected portfolio value ({base_value})"
+        self.holdings = new_holdings
 
     def get_weights(self):
         """
@@ -201,9 +207,12 @@ class Portfolio:
         """
         if not hasattr(self, "holdings"):
             return self.weights
-
-        self.delegate.rebalance(self.holdings, prices, self.weights)
-        return self.weights
+        try:
+            self.delegate.rebalance(self.holdings, prices, self.weights)
+            return self.weights
+        except Exception as e:
+            print(e)
+            return self.weights
 
     def value(self, prices: pd.Series):
         """

@@ -48,14 +48,11 @@ def optimize_trades(
 
     objective = cp.Minimize(
         cp.sum_squares(new_weights - new_target_weights.values)
-        + cp.sum_squares(new_holdings - holdings.values)
+        # + cp.sum_squares(new_holdings - holdings.values)
     )
 
     problem = cp.Problem(objective, constraints)
-    problem.solve(warm_start=True)
-
-    print(new_weights.value - new_target_weights.values)
-    print(problem.status)
+    problem.solve(solver=cp.ECOS)
 
     if problem.status == cp.INFEASIBLE:
         raise Exception(
@@ -66,8 +63,8 @@ def optimize_trades(
     new_holdings_value = (new_holdings.value * prices).sum()
 
     assert np.isclose(
-        projected_portfolio_val, new_holdings_value, atol=0.001
-    ), "The new holdings value does not match projected portfolio value"
+        projected_portfolio_val, new_holdings_value, atol=0.00001
+    ), f"The new holdings value ({new_holdings_value}) does not match projected portfolio value ({projected_portfolio_val})"
 
     diff = new_holdings.value - holdings.values
     diff = pd.Series(diff, index=prices.index)

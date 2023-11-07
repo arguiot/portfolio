@@ -134,7 +134,7 @@ def create_portfolios(
 ):
     _df = get_historical_prices_for_assets(
         asset_list[asset_class],
-        time_range=timedelta(days=365 * 1 + 120),  # 1 years
+        time_range=timedelta(days=365 * 3),  # 3 years
         interested_columns=["ReferenceRate", "CapMrktEstUSD"],
     )
 
@@ -174,7 +174,7 @@ def create_portfolios(
     elif asset_class == "low_risk_tickers":
         budget = {}
 
-    initial_bid = 1000
+    initial_bid = 1000.0
 
     chosen_delegate = (
         OptRebalancingPortfolioDelegate()
@@ -309,16 +309,16 @@ def create_portfolios(
         portfolios={
             "HRP": porfolio_hrp,
             "Markowitz": portfolio_markowitz,
-            "BL": portfolio_bl,
+            # "BL": portfolio_bl,
             "Risk Parity": portfolio_parity,
-            "Fast Risk Parity": portfolio_fast_parity,
-            "Heuristic": portfolio_default,
-            "Reward to Risk": portfolio_rtr,
-            "Simple Volatility": portfolio_vo,
-            "Volatility of Volatility": portfolio_vov,
-            "Value At Risk": portfolio_var,
-            "Reward to VaR": portfolio_rvar,
-            "Combination": portfolio_combination,
+            # "Fast Risk Parity": portfolio_fast_parity,
+            # "Heuristic": portfolio_default,
+            # "Reward to Risk": portfolio_rtr,
+            # "Simple Volatility": portfolio_vo,
+            # "Volatility of Volatility": portfolio_vov,
+            # "Value At Risk": portfolio_var,
+            # "Reward to VaR": portfolio_rvar,
+            # "Combination": portfolio_combination,
         },
         start_date=start_date_portfolio,
         end_date=df.index[-1],
