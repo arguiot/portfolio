@@ -27,6 +27,7 @@ class Markowitz(GeneralOptimization):
     class EfficientPortfolio(Enum):
         MAX_SHARPE = "max_sharpe"
         MIN_VOLATILITY = "min_volatility"
+        MAX_RETURN = "max_return"
 
     def __init__(self, df, mcaps=None, cov=None, weight_bounds=(0, 1)):
         """
@@ -95,6 +96,8 @@ class Markowitz(GeneralOptimization):
                 self.ef.max_sharpe(risk_free_rate=risk_free_rate)
             elif self.efficient_portfolio == self.EfficientPortfolio.MIN_VOLATILITY:
                 self.ef.min_volatility()
+            elif self.efficient_portfolio == self.EfficientPortfolio.MAX_RETURN:
+                self.ef.max_quadratic_utility()
         elif isinstance(self.efficient_portfolio, float):
             self.ef.efficient_return(self.efficient_portfolio)
 
