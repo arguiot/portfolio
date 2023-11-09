@@ -48,7 +48,7 @@ def optimize_trades(
 
     objective = cp.Minimize(
         cp.sum_squares(new_weights - new_target_weights.values)
-        # + cp.sum_squares(new_holdings - holdings.values)
+        # + cp.norm1(new_holdings - holdings.values)
     )
 
     problem = cp.Problem(objective, constraints)
