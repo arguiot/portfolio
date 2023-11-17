@@ -5,6 +5,7 @@ from math import ceil
 
 
 def optimize_trades(
+    base_value: float,
     holdings: pd.Series,
     new_target_weights: pd.Series,
     prices: pd.Series,
@@ -14,19 +15,18 @@ def optimize_trades(
 ):
     shared_index = prices.index.intersection(new_target_weights.index)
 
-    prices = prices.reindex(shared_index)
-    holdings = holdings.reindex(shared_index)
-    new_target_weights = new_target_weights.reindex(shared_index)
+    _prices = prices.reindex(shared_index)
+    _holdings = holdings.reindex(shared_index)
+    _new_target_weights = new_target_weights.reindex(shared_index)
 
     if not isinstance(min_W, float):
         min_W = min_W.reindex(shared_index)
     if not isinstance(max_W, float):
         max_W = max_W.reindex(shared_index)
 
-    current_value = (holdings * prices).sum()
-    n_assets = len(holdings)
+    n_assets = len(_holdings)
 
-    projected_portfolio_val = current_value + external_movement
+    projected_portfolio_val = base_value + external_movement
 
     # Define new holdings as a variable
     new_holdings = cp.Variable(n_assets)
@@ -34,21 +34,22 @@ def optimize_trades(
     min_W = min_W if isinstance(min_W, float) else min_W.values
     max_W = max_W if isinstance(max_W, float) else max_W.values
 
+    # Relative weights of the new portfolio
+    new_weights = cp.multiply(new_holdings, _prices.values) / projected_portfolio_val
+
     # Constraint: new total assets value should not exceed the adjusted current value
     constraints = [
-        cp.sum(cp.multiply(new_holdings, prices.values)) == projected_portfolio_val,
+        cp.sum(cp.multiply(new_holdings, _prices.values)) == projected_portfolio_val,
         cp.multiply(min_W, projected_portfolio_val)
-        <= cp.multiply(new_holdings, prices.values),
-        cp.multiply(new_holdings, prices.values)
+        <= cp.multiply(new_holdings, _prices.values),
+        cp.multiply(new_holdings, _prices.values)
         <= cp.multiply(max_W, projected_portfolio_val),
+        cp.sum(new_weights) == 1,
     ]
 
-    # Relative weights of the new portfolio
-    new_weights = cp.multiply(new_holdings, prices.values) / projected_portfolio_val
-
     objective = cp.Minimize(
-        cp.sum_squares(new_weights - new_target_weights.values)
-        # + cp.norm1(new_holdings - holdings.values)
+        cp.sum_squares(new_weights - _new_target_weights.values)
+        # cp.norm1(new_holdings - holdings.values)
     )
 
     problem = cp.Problem(objective, constraints)
@@ -60,18 +61,30 @@ def optimize_trades(
         )
 
     # Get new holdings value
-    new_holdings_value = (new_holdings.value * prices).sum()
+    new_holdings = pd.Series(new_holdings.value, index=_prices.index)
+    new_holdings_value = (new_holdings * prices).sum()
+
+    # Make sure that no asset is above max_W
+    current_weights = (_prices * _holdings) / (base_value + external_movement)
+    is_overweight = current_weights > max_W
+    if is_overweight.any() or not np.isclose(
+        new_holdings_value, projected_portfolio_val, 1e-9
+    ):
+        # Then, we just rebalance to optimal weights, super straightforward
+        new_holdings = new_target_weights * (base_value + external_movement) / prices
+        trades = new_holdings - holdings
+        return trades
 
     assert np.isclose(
-        projected_portfolio_val, new_holdings_value, atol=0.00001
-    ), f"The new holdings value ({new_holdings_value}) does not match projected portfolio value ({projected_portfolio_val})"
+        projected_portfolio_val, new_holdings_value, 1e-9
+    ), f"[OPT] The new holdings value ({new_holdings_value}) does not match projected portfolio value ({projected_portfolio_val})"
 
-    diff = new_holdings.value - holdings.values
-    diff = pd.Series(diff, index=prices.index)
+    diff = new_holdings - holdings
     return diff
 
 
 def deterministic_optimal_rebalancing(
+    base_value: float,
     holdings: pd.Series,
     new_target_weights: pd.Series,
     prices: pd.Series,
@@ -90,8 +103,16 @@ def deterministic_optimal_rebalancing(
     if not isinstance(max_W, float):
         max_W = max_W.reindex(shared_index)
 
+    # Replace all NaNs with 0s and if the weight is less than 1e-9, set it to 0
+    min_W = min_W.fillna(0)
+    min_W[min_W < 1e-9] = 0
+    max_W = max_W.fillna(0)
+    max_W[max_W < 1e-9] = 0
+    new_target_weights = new_target_weights.fillna(0)
+    new_target_weights[new_target_weights < 1e-9] = 0
+
     # Calculate current portfolio value and current weights of assets
-    portfolio_value = (prices * holdings).sum()
+    portfolio_value = base_value
     current_weights = (prices * holdings) / (portfolio_value + external_movement)
 
     trades = pd.Series(index=shared_index, data=0)
@@ -210,9 +231,21 @@ def deterministic_optimal_rebalancing(
             idx += 1
 
     total_trade_value = (trades * prices).sum()
-    if not np.isclose(total_trade_value, external_movement, atol=1e-8):
+    # Check that no asset is above max_W
+    current_weights = (prices * (holdings + trades)) / (
+        portfolio_value + external_movement
+    )
+    current_weights[current_weights < 1e-9] = 0
+    is_overweight = current_weights > max_W
+
+    if (
+        not np.isclose(total_trade_value, external_movement, 1e-9)
+        or is_overweight.any()
+    ):
         print(
             f"The total trade value is not the same as the external movement. Total trade value: {total_trade_value}, external movement: {external_movement}. Trades: {trades * prices}"
+            if not np.isclose(total_trade_value, external_movement, 1e-9)
+            else f"The portfolio is overweight. Current weights: {current_weights}, max_W: {max_W}. Overweight assets: {is_overweight}"
         )
         # Then, we just rebalance to optimal weights, super straightforward
         new_holdings = (

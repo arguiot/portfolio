@@ -3,7 +3,11 @@ import pandas as pd
 
 class PortfolioDelegate:
     def rebalance(
-        self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
+        self,
+        holdings: pd.Series,
+        prices: pd.Series,
+        target_weights: pd.Series,
+        base_value: float,
     ) -> pd.Series:
         """
         Rebalance the portfolio to the target weights. The portfolio is rebalanced by

@@ -134,14 +134,14 @@ class Portfolio:
 
         if self.optimiser is VolatilityOfVolatility:
             new_weights = new_weights.clip(0, 1)
-
-        assert np.isclose(new_weights.sum(), 1, 0.01), (
+        new_weights = new_weights / new_weights.sum()
+        assert np.isclose(new_weights.sum(), 1, 1e-9), (
             f"Sum of raw weights is {new_weights.sum()}, " f"but expected value is 1."
         )
-        real_weights = self.get_current_weights(current_prices)
+
         self.weights = new_weights
 
-        assert np.isclose(self.weights.sum(), 1, 0.0001), (
+        assert np.isclose(self.weights.sum(), 1, 1e-9), (
             f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
         )
 
@@ -149,13 +149,19 @@ class Portfolio:
             self.holdings = base_value * self.weights / current_prices
 
         new_holdings = self.delegate.rebalance(
-            self.holdings, current_prices, self.weights
+            self.holdings, current_prices, self.weights, base_value
         )
-
         # Check that the value of the portfolio is the same as the base value
-        assert np.isclose(
-            (new_holdings * current_prices).sum(), base_value, 0.01
-        ), f"The new holdings value ({(new_holdings * current_prices).sum()}) does not match projected portfolio value ({base_value})"
+        if not np.isclose((new_holdings * current_prices).sum(), base_value, 1e-9):
+            # Rebalance optimally
+            new_holdings = PortfolioDelegate().rebalance(
+                self.holdings, current_prices, self.weights, base_value
+            )
+        # Remove any asset that is less than 1e-9 in dollar value
+        new_holdings_dollar_value = new_holdings * current_prices
+        mask = new_holdings_dollar_value < 1e-9
+        new_holdings[mask] = 0
+
         self.holdings = new_holdings
 
     def get_weights(self):
@@ -208,7 +214,9 @@ class Portfolio:
         if not hasattr(self, "holdings"):
             return self.weights
         try:
-            self.delegate.rebalance(self.holdings, prices, self.weights)
+            self.delegate.rebalance(
+                self.holdings, prices, self.weights, base_value=self.value(prices)
+            )
             return self.weights
         except Exception as e:
             print(e)

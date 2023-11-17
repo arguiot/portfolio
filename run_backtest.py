@@ -43,9 +43,14 @@ from portfolio_optimization.portfolio.trade_generator import totalOrders, orderS
 
 class OptRebalancingPortfolioDelegate(PortfolioDelegate):
     def rebalance(
-        self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
+        self,
+        holdings: pd.Series,
+        prices: pd.Series,
+        target_weights: pd.Series,
+        base_value,
     ) -> pd.Series:
-        diff = deterministic_optimal_rebalancing(
+        diff = optimize_trades(  # or deterministic_optimal_rebalancing
+            base_value=base_value,
             holdings=holdings,
             new_target_weights=target_weights,
             prices=prices,
@@ -54,13 +59,17 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
             external_movement=0,
         )
 
-        new_holdings = pd.Series(diff, index=holdings.index) + holdings
+        new_holdings = diff + holdings
         return new_holdings
 
 
 class HeuristicRebalancingPortfolioDelegate(PortfolioDelegate):
     def rebalance(
-        self, holdings: pd.Series, prices: pd.Series, target_weights: pd.Series
+        self,
+        holdings: pd.Series,
+        prices: pd.Series,
+        target_weights: pd.Series,
+        base_value,
     ) -> pd.Series:
         tbd = 0
         weight_assets = [
@@ -103,7 +112,6 @@ class HeuristicRebalancingPortfolioDelegate(PortfolioDelegate):
 
 class CustomMarkowitzDelegate(GeneralOptimizationDelegate):
     def setup(self, optimization_object: Markowitz):
-        print("Setting up Markowitz")
         optimization_object.mode = optimization_object.CovMode.LEDOIT_WOLF
         optimization_object.efficient_portfolio = (
             optimization_object.EfficientPortfolio.MAX_SHARPE
@@ -151,24 +159,24 @@ def create_portfolios(
     # Specify per asset as well
     max_weight = {"*": 1.0}
     if asset_class == "high_risk_tickers":
-        max_weight = {"btc": 0.1, "*": 0.15}
+        max_weight = {"*": 0.15}
     elif asset_class == "medium_risk_tickers":
         max_weight = 0.05
     elif asset_class == "low_risk_tickers":
-        max_weight = 0.3
+        max_weight = 0.25
 
-    min_weight = 0
+    min_weight = {"*": 0}
     # min_weight = { 'btc': 0.05, '*': 0.01 }
-    if asset_class == "high_risk_tickers":
-        min_weight = {"sol": 0.05, "*": 0.01}
-    elif asset_class == "medium_risk_tickers":
-        min_weight = 0.01
-    elif asset_class == "low_risk_tickers":
-        min_weight = 0.01
+    # if asset_class == "high_risk_tickers":
+    #     min_weight = {"*": 0.01}
+    # elif asset_class == "medium_risk_tickers":
+    #     min_weight = 0.01
+    # elif asset_class == "low_risk_tickers":
+    #     min_weight = 0.01
 
     budget = {}
     if asset_class == "high_risk_tickers":
-        budget = {"uni": 1.2}  # Extra 20% for UNI
+        budget = {}
     elif asset_class == "medium_risk_tickers":
         budget = {}
     elif asset_class == "low_risk_tickers":
@@ -323,7 +331,7 @@ def create_portfolios(
         start_date=start_date_portfolio,
         end_date=df.index[-1],
         rebalance_frequency=rebalance_frequency,
-        adjust_holdings=True,
+        adjust_holdings=False,
         data=df,
         mcaps=mcaps,
         asset_class=asset_class,

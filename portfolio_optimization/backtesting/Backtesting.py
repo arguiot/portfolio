@@ -23,6 +23,7 @@ class PortfolioPerformance:
         portfolio_compositions: Series,
         portfolio_raw_composition: Series,
         portfolio_holdings: Series,
+        portfolio_live_weights: Series,
         portfolio_metrics: Series = None,
     ):
         self.name = portfolio_name
@@ -31,6 +32,7 @@ class PortfolioPerformance:
         self.portfolio_compositions = portfolio_compositions
         self.portfolio_raw_composition = portfolio_raw_composition
         self.portfolio_holdings = portfolio_holdings
+        self.portfolio_live_weights = portfolio_live_weights
         self.portfolio_metrics = portfolio_metrics
 
     def decompose_grouped_tokens(self, rosetta: pd.Series):
@@ -55,6 +57,7 @@ class PortfolioPerformance:
             self.portfolio_compositions.loc[:end_date],
             self.portfolio_raw_composition.loc[:end_date],
             self.portfolio_holdings.loc[:end_date],
+            self.portfolio_live_weights.loc[:end_date],
             self.portfolio_metrics.loc[:end_date]
             if self.portfolio_metrics is not None
             else None,
@@ -109,6 +112,11 @@ class Backtest:
         self.portfolio_holdings = {
             name: pd.Series(name="Holdings") for name in portfolios.keys()
         }
+
+        self.portfolio_live_weights = {
+            name: pd.Series(name="Live Weights") for name in portfolios.keys()
+        }
+
         self.portfolio_metrics = {
             name: pd.Series(name="Metrics") for name in portfolios.keys()
         }
@@ -143,11 +151,11 @@ class Backtest:
                 historical_data = self.price_data.loc[start:date]
                 try:
                     mcaps = self.mcaps.loc[date] if self.mcaps is not None else None
-
+                    _current_value = portfolio.value(prices)
                     portfolio.rebalance(
                         historical_data,
                         prices,
-                        self.portfolio_values[name].loc[date, "Portfolio Value"],
+                        _current_value,
                         mcaps,
                     )
                 except Exception as e:
@@ -161,6 +169,9 @@ class Backtest:
                 self.portfolio_raw_composition[name].loc[date] = portfolio.raw_weights
                 self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
             self.portfolio_holdings[name].loc[date] = portfolio.holdings
+            self.portfolio_live_weights[name].loc[date] = (
+                portfolio.holdings * prices / (portfolio.value(prices))
+            )
             self.delegate.post_process(self, portfolio, date)
         progress_logger.end_task(name) if progress_logger is not None else None
 
@@ -171,6 +182,7 @@ class Backtest:
             self.portfolio_compositions[name],
             self.portfolio_raw_composition[name],
             self.portfolio_holdings[name],
+            self.portfolio_live_weights[name],
             self.portfolio_metrics[name],
         )
 
@@ -397,17 +409,12 @@ class Backtest:
                 writer, sheet_name=performance.name, startrow=3, startcol=startcol
             )
 
-            # Based on holdings__df and price_data, write the "Live Weight" column. Live weight is the basically the holding * price / portfolio value.
-            live_weight = holdings__df.copy()
-            for asset in live_weight.columns:
-                if asset not in price_data.columns:
-                    continue
-                live_weight[asset] = (
-                    live_weight[asset] * price_data[asset] / value["Portfolio Value"]
-                )
-            startcol += 5 + holdings__df.shape[1]
+            # Live weight is the basically the holding * price / portfolio value.
+            live_weights_df = pd.DataFrame(performance.portfolio_live_weights.tolist())
+            live_weights_df.index = performance.portfolio_live_weights.index
+            startcol += 5 + live_weights_df.shape[1]
             sheet.write(2, startcol, "Live Weight")
-            live_weight.to_excel(
+            live_weights_df.to_excel(
                 writer, sheet_name=performance.name, startrow=3, startcol=startcol
             )
 
@@ -423,7 +430,10 @@ class Backtest:
         for asset in self.price_data.columns:
             try:
                 overview_df[asset] = self.portfolio_analysis(
-                    self.price_data, asset, risk_free_rate_pos, is_asset=True
+                    self.price_data.loc[self.start_date : self.end_date],
+                    asset,
+                    risk_free_rate_pos,
+                    is_asset=True,
                 )[1]
             except Exception as e:
                 print(str(e))
