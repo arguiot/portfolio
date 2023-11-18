@@ -214,9 +214,10 @@ class Portfolio:
         if not hasattr(self, "holdings"):
             return self.weights
         try:
-            self.delegate.rebalance(
+            new_holdings = self.delegate.rebalance(
                 self.holdings, prices, self.weights, base_value=self.value(prices)
             )
+            self.holdings = new_holdings
             return self.weights
         except Exception as e:
             print(e)

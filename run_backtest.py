@@ -158,12 +158,12 @@ def create_portfolios(
 
     # Specify per asset as well
     max_weight = {"*": 1.0}
-    if asset_class == "high_risk_tickers":
-        max_weight = {"*": 0.15}
-    elif asset_class == "medium_risk_tickers":
-        max_weight = 0.05
-    elif asset_class == "low_risk_tickers":
-        max_weight = 0.25
+    # if asset_class == "high_risk_tickers":
+    #     max_weight = {"*": 0.15}
+    # elif asset_class == "medium_risk_tickers":
+    #     max_weight = 0.05
+    # elif asset_class == "low_risk_tickers":
+    #     max_weight = 0.25
 
     min_weight = {"*": 0}
     # min_weight = { 'btc': 0.05, '*': 0.01 }
@@ -184,9 +184,10 @@ def create_portfolios(
 
     initial_bid = 1000.0
 
-    chosen_delegate = (
-        OptRebalancingPortfolioDelegate()
-    )  # Or HeuristicRebalancingPortfolioDelegate()
+    chosen_delegate = PortfolioDelegate()
+    # (
+    #     OptRebalancingPortfolioDelegate()
+    # )  # Or HeuristicRebalancingPortfolioDelegate()
 
     porfolio_hrp = Portfolio(
         base_value=initial_bid,
