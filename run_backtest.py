@@ -142,7 +142,7 @@ def create_portfolios(
 ):
     _df = get_historical_prices_for_assets(
         asset_list[asset_class],
-        time_range=timedelta(days=365 * 3),  # 3 years
+        time_range=timedelta(days=365 * 3 + 120),  # 3 years + 120 days
         interested_columns=["ReferenceRate", "CapMrktEstUSD"],
     )
 
@@ -156,14 +156,16 @@ def create_portfolios(
 
     start_date_portfolio = df.index[0] + relativedelta(days=120)
 
+    print(f"[START DATE]: {start_date_portfolio}")
+
     # Specify per asset as well
     max_weight = {"*": 1.0}
-    # if asset_class == "high_risk_tickers":
-    #     max_weight = {"*": 0.15}
-    # elif asset_class == "medium_risk_tickers":
-    #     max_weight = 0.05
-    # elif asset_class == "low_risk_tickers":
-    #     max_weight = 0.25
+    if asset_class == "high_risk_tickers":
+        max_weight = {"*": 0.15}
+    elif asset_class == "medium_risk_tickers":
+        max_weight = 0.05
+    elif asset_class == "low_risk_tickers":
+        max_weight = 0.25
 
     min_weight = {"*": 0}
     # min_weight = { 'btc': 0.05, '*': 0.01 }
@@ -184,9 +186,7 @@ def create_portfolios(
 
     initial_bid = 1000.0
 
-    chosen_delegate = PortfolioDelegate()
-    # (
-    #     OptRebalancingPortfolioDelegate()
+    chosen_delegate = OptRebalancingPortfolioDelegate()
     # )  # Or HeuristicRebalancingPortfolioDelegate()
 
     porfolio_hrp = Portfolio(
@@ -332,7 +332,7 @@ def create_portfolios(
         start_date=start_date_portfolio,
         end_date=df.index[-1],
         rebalance_frequency=rebalance_frequency,
-        adjust_holdings=False,
+        adjust_holdings=True,
         data=df,
         mcaps=mcaps,
         asset_class=asset_class,
