@@ -74,13 +74,13 @@ class HeuristicRebalancingPortfolioDelegate(PortfolioDelegate):
         tbd = 0
         weight_assets = [
             (
-                target_weights[i]
-                if i in target_weights
-                else 0,  # - 0.1 * target_weights[i],
+                (
+                    target_weights[i] if i in target_weights else 0
+                ),  # - 0.1 * target_weights[i],
                 target_weights[i] if i in target_weights else 0,
-                target_weights[i]
-                if i in target_weights
-                else 0,  # + 0.1 * target_weights[i]
+                (
+                    target_weights[i] if i in target_weights else 0
+                ),  # + 0.1 * target_weights[i]
             )
             for i in prices.index
         ]
@@ -142,7 +142,7 @@ def create_portfolios(
 ):
     _df = get_historical_prices_for_assets(
         asset_list[asset_class],
-        time_range=timedelta(days=365 * 3 + 120),  # 3 years + 120 days
+        time_range=timedelta(days=365 * 3 + 120),  # 4 years + 120 days (look back)
         interested_columns=["ReferenceRate", "CapMrktEstUSD"],
     )
 
@@ -167,7 +167,7 @@ def create_portfolios(
     elif asset_class == "low_risk_tickers":
         max_weight = 0.25
 
-    min_weight = {"*": 0}
+    min_weight = {"*": 0.0}
     # min_weight = { 'btc': 0.05, '*': 0.01 }
     # if asset_class == "high_risk_tickers":
     #     min_weight = {"*": 0.01}
@@ -184,9 +184,10 @@ def create_portfolios(
     elif asset_class == "low_risk_tickers":
         budget = {}
 
-    initial_bid = 1000.0
+    initial_bid = 3000.0
 
-    chosen_delegate = OptRebalancingPortfolioDelegate()
+    chosen_delegate = HeuristicRebalancingPortfolioDelegate()
+    # OptRebalancingPortfolioDelegate()
     # )  # Or HeuristicRebalancingPortfolioDelegate()
 
     porfolio_hrp = Portfolio(
@@ -332,7 +333,7 @@ def create_portfolios(
         start_date=start_date_portfolio,
         end_date=df.index[-1],
         rebalance_frequency=rebalance_frequency,
-        adjust_holdings=True,
+        adjust_holdings=False,
         data=df,
         mcaps=mcaps,
         asset_class=asset_class,
@@ -435,17 +436,29 @@ if __name__ == "__main__":
             )
             perfs.append(risk_parity)
 
-        parity_processor = ParityBacktestingProcessor(
-            perfs[0],
-            perfs[1],
-            perfs[2],
-        )
-        parity_processor.delegate = CustomParityDelegate()
-        parity_perf = parity_processor.backtest(initial_cash=1000)
-        backtests[0].price_data = parity_processor.price_data()
-        backtests[0].export_results(
-            performances=[parity_perf],
-            folder_path=f"./out/{rebalance_frequency}",
-            file_name="parity.xlsx",
-        )
+        parity_line = ParityLine()
+        parity_line.regression(perfs[0], perfs[1], perfs[2])
+
+        print(f"[PARITY LINE]:")
+        print(f"Sigma A: {parity_line.sigma_a}")
+        print(f"Sigma B: {parity_line.sigma_b}")
+        print(f"Sigma C: {parity_line.sigma_c}")
+        print(f"Return A: {parity_line.r_a}")
+        print(f"Return B: {parity_line.r_b}")
+        print(f"Return C: {parity_line.r_c}")
+        print(f"Weight A: {parity_line.weight_A}")
+        print(f"Weight B: {parity_line.weight_B}")
+        # parity_processor = ParityBacktestingProcessor(
+        #     perfs[0],
+        #     perfs[1],
+        #     perfs[2],
+        # )
+        # parity_processor.delegate = CustomParityDelegate()
+        # parity_perf = parity_processor.backtest(initial_cash=3000)
+        # backtests[0].price_data = parity_processor.price_data()
+        # backtests[0].export_results(
+        #     performances=[parity_perf],
+        #     folder_path=f"./out/{rebalance_frequency}",
+        #     file_name="parity.xlsx",
+        # )
     progress_logger.delete()
