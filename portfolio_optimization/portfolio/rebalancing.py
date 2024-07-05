@@ -31,8 +31,8 @@ def optimize_trades(
     # Define new holdings as a variable
     new_holdings = cp.Variable(n_assets)
 
-    min_W = min_W if isinstance(min_W, float) else min_W.values
-    max_W = max_W if isinstance(max_W, float) else max_W.values
+    min_W = min_W if isinstance(min_W, float) else min_W.values # = 0
+    max_W = max_W if isinstance(max_W, float) else max_W.values # = 1
 
     # Relative weights of the new portfolio
     new_weights = cp.multiply(new_holdings, _prices.values) / projected_portfolio_val
@@ -170,8 +170,8 @@ def deterministic_optimal_rebalancing(
             break
 
     # Step 5: Check the cash flow
-    start_cash = (prices * holdings).sum() + external_movement
-    end_cash = (prices * (holdings + trades)).sum()
+    start_cash = (prices * holdings).sum()
+    end_cash = (prices * (holdings + trades)).sum() + external_movement
 
     # Update deviation after trades
     current_weights = (prices * (holdings + trades)) / end_cash

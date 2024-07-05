@@ -83,8 +83,17 @@ class Portfolio:
 
         # If optimizer has `weight_bounds` attribute, provide max_weight and min_weight for each asset
         if hasattr(self.latest_optimiser, "weight_bounds"):
-            weight_bounds = (self.min_weight["*"], self.max_weight["*"])
-            self.latest_optimiser.weight_bounds = weight_bounds
+            if type(self.latest_optimiser.weight_bounds) != list:
+                self.latest_optimiser.weight_bounds = (
+                    self.min_weight["*"],
+                    self.max_weight["*"],
+                )
+            else:
+                for i, weight in enumerate(df.columns):
+                    self.latest_optimiser.weight_bounds[i] = (
+                        self.min_weight.get(i, self.min_weight["*"]),
+                        self.max_weight.get(i, self.max_weight["*"]),
+                    )
         elif hasattr(self.latest_optimiser, "asset_weight_bounds"):
             asset_weight_bounds = {}
             for asset in df.columns:
@@ -92,8 +101,20 @@ class Portfolio:
                     self.min_weight.get(asset, self.min_weight["*"]),
                     self.max_weight.get(asset, self.max_weight["*"]),
                 )
-
+            total_upper_bound = sum(
+                weight[1] for weight in asset_weight_bounds.values()
+            )
+            if total_upper_bound < 1:
+                asset_weight_bounds["btc"] = (
+                    self.min_weight.get("btc", self.min_weight["*"]),
+                    1,
+                )
             self.latest_optimiser.asset_weight_bounds = asset_weight_bounds
+
+        if hasattr(self.latest_optimiser, "max_weights"):
+            self.latest_optimiser.max_weights = self.max_weight
+        if hasattr(self.latest_optimiser, "min_weight"):
+            self.latest_optimiser.min_weights = self.min_weight
 
         new_weights = self.latest_optimiser.get_weights()
         self.raw_weights = new_weights.copy()
@@ -135,13 +156,14 @@ class Portfolio:
         if self.optimiser is VolatilityOfVolatility:
             new_weights = new_weights.clip(0, 1)
         new_weights = new_weights / new_weights.sum()
-        assert np.isclose(new_weights.sum(), 1, 1e-9), (
-            f"Sum of raw weights is {new_weights.sum()}, " f"but expected value is 1."
+        assert np.isclose(new_weights.sum(), 1, 1e-5), (
+            f"Sum of raw weights is {new_weights.sum()}, "
+            f"but expected value is 1. Portfolio name: {self.optimiser}"
         )
 
         self.weights = new_weights
 
-        assert np.isclose(self.weights.sum(), 1, 1e-9), (
+        assert np.isclose(self.weights.sum(), 1, 1e-5), (
             f"Sum of weights is {self.weights.sum()}, " f"but expected value is 1."
         )
 

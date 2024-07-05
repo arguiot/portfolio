@@ -9,7 +9,8 @@ def get_historical_prices_for_assets(
     assets_list=None,
     folder_path="data/csv",
     interested_columns=["ReferenceRate"],
-    time_range=datetime.timedelta(days=90),
+    start_date=pd.to_datetime("2021-06-26"),
+    end_date=pd.to_datetime("2024-06-25"),
 ):
     """
     ...
@@ -75,11 +76,12 @@ def get_historical_prices_for_assets(
         df.set_index("date", inplace=True)  # Set date as index
 
         # If time_range is not set, create one for 3 years
-        max_date = df.index.max()
-        if not time_range and max_date - time_range > df.index.min():
-            time_range = max_date - df.index.min()
+        max_date = end_date
 
-        date_range = pd.date_range(start=max_date - time_range, end=max_date)
+        date_range = pd.date_range(start=start_date, end=max_date).drop_duplicates()
+
+        # Remove duplicate labels from the DataFrame's index
+        df = df[~df.index.duplicated(keep="first")]
 
         # Reindex df to fill missing dates
         df = df.reindex(date_range, fill_value=np.nan)

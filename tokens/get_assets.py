@@ -26,6 +26,7 @@ def get_tickers():
     high_risk_path = os.path.join(script_dir, "high_risk.txt")
     med_risk_path = os.path.join(script_dir, "medium_risk.txt")
     low_risk_path = os.path.join(script_dir, "low_risk.txt")
+    # arthur_path = os.path.join(script_dir, "arthur.txt")
 
     # Print the amount of tickers in each file
     print("High risk tickers:", len(read_tickers_from_file(high_risk_path)))
@@ -55,6 +56,7 @@ def get_tickers():
         "high_risk_tickers": read_tickers_from_file(high_risk_path),
         "medium_risk_tickers": read_tickers_from_file(med_risk_path),
         "low_risk_tickers": read_tickers_from_file(low_risk_path),
+        # "arthur_tickers": read_tickers_from_file(arthur_path),
     }
 
 

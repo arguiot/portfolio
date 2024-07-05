@@ -34,10 +34,11 @@ class HRPOptimization(GeneralOptimization):
     def __init__(self, df, mcaps=None, rets=None, asset_weight_bounds={"*": (0, 1)}):
         super().__init__(df, mcaps=mcaps)
         self.asset_weight_bounds = asset_weight_bounds
-        if rets is None:
+        if rets is None or rets.empty:
             self.rets = expected_returns(df)
         else:
             self.rets = rets
+
         self.rets = self.rets.fillna(0)
         self.port = rp.HCPortfolio(returns=self.rets)
 
@@ -56,6 +57,13 @@ class HRPOptimization(GeneralOptimization):
         None
 
         """
+        if self.df is None or self.df.shape[1] == 0:
+            self.weights = pd.Series()
+            return
+        if self.rets is None or self.rets.shape[0] == 0:
+            self.rets = expected_returns(self.df)
+            print(f"Rets: {self.rets}")
+            print(f"df: {self.df}")
 
         self.process_asset_weight_bounds()
         min_vec = pd.Series(
@@ -66,6 +74,16 @@ class HRPOptimization(GeneralOptimization):
             [self.asset_weight_bounds[asset][1] for asset in self.df.columns],
             index=self.df.columns,
         )
+
+        total_upper_bound = max_vec.sum()
+        if total_upper_bound < 1:
+            if "usdc" in self.df.columns:
+                max_vec["usdc"] = 1.0
+            elif "btc" in self.df.columns:
+                max_vec["btc"] = 1.0
+            elif "bnb" in self.df.columns:
+                max_vec["bnb"] = 1.0
+
         self.port.w_min = min_vec
         self.port.w_max = max_vec
 

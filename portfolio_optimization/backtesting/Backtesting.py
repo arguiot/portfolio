@@ -58,9 +58,11 @@ class PortfolioPerformance:
             self.portfolio_raw_composition.loc[:end_date],
             self.portfolio_holdings.loc[:end_date],
             self.portfolio_live_weights.loc[:end_date],
-            self.portfolio_metrics.loc[:end_date]
-            if self.portfolio_metrics is not None
-            else None,
+            (
+                self.portfolio_metrics.loc[:end_date]
+                if self.portfolio_metrics is not None
+                else None
+            ),
         )
 
 
@@ -173,7 +175,11 @@ class Backtest:
                 portfolio.holdings * prices / (portfolio.value(prices))
             )
             self.delegate.post_process(self, portfolio, date)
-        progress_logger.end_task(name) if progress_logger is not None else None
+        (
+            progress_logger.end_task(name)
+            if progress_logger is not None and hasattr(progress_logger, "end_task")
+            else None
+        )
 
         return PortfolioPerformance(
             name,

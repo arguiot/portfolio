@@ -64,8 +64,12 @@ class ParityLine:
             )
             ** (1 / years_b)
         ) - 1
-        self.sigma_a = portfolio_a.portfolio_value["Portfolio Value"].pct_change().std()
-        self.sigma_b = portfolio_b.portfolio_value["Portfolio Value"].pct_change().std()
+        self.sigma_a = portfolio_a.portfolio_value[
+            "Portfolio Value"
+        ].pct_change().std() * np.sqrt(365)
+        self.sigma_b = portfolio_b.portfolio_value[
+            "Portfolio Value"
+        ].pct_change().std() * np.sqrt(365)
 
         r_ab = self.weight_A * self.r_a + self.weight_B * self.r_b
         risk_ab = self.weight_A * self.sigma_a + self.weight_B * self.sigma_b
@@ -81,7 +85,9 @@ class ParityLine:
             )
             ** (1 / years_c)
         ) - 1
-        self.sigma_c = portfolio_g.portfolio_value["Portfolio Value"].pct_change().std()
+        self.sigma_c = portfolio_g.portfolio_value[
+            "Portfolio Value"
+        ].pct_change().std() * np.sqrt(365)
 
         # Risk is x, return is y, we need to find a and b such that y = ax + b
         a = (self.r_c - r_ab) / (self.sigma_c - risk_ab)
