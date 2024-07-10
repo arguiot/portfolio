@@ -137,6 +137,9 @@ for (let filePath of filePaths) {
   if (filePath) {
     if (os.platform() === 'darwin') {  // Check if it is macOS
       console.log(`📂 Opening ${filePath}`);
+      if (process.argv.includes('--no-open')) {
+        continue;
+      }
       spawn('open', ['-a', 'Microsoft Excel', filePath]);
       Bun.sleep(5000);
     }

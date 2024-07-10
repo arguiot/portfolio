@@ -75,10 +75,10 @@ def create_portfolios(
         max_weight = {"*": 0.05}
     elif asset_class == "low_risk_tickers":
         max_weight = {
-            # "classA": {
-            #     "sum": 0.68,
-            #     "assets": ["usdc", "usdt", "dai"],
-            # },
+            "classA": {
+                "sum": 0.6,
+                "assets": ["usdc", "usdt", "dai"],
+            },
             "classB": {
                 "sum": 0.3,
                 "assets": [
@@ -93,34 +93,15 @@ def create_portfolios(
                     "pyusd",
                 ],
             },
-            # "volatile": {
-            #     "sum": 0.1,
-            #     "assets": [
-            #         "btc",
-            #         "eth",
-            #         "bnb",
-            #         "matic",
-            #         "xaut",
-            #         "paxg",
-            #     ],
-            # },
-            "non_volatile": {
-                "sum": 0.9,
+            "volatile": {
+                "sum": 0.1,
                 "assets": [
-                    "usdc",
-                    "usdt",
-                    "dai",
-                    "usde",
-                    "usdd",
-                    "pyusd",
-                    "tusd",
-                    "frax",
-                    "gho",
-                    "usdd",
-                    "fdusd",
-                    "usde",
-                    "crvusd",
-                    "susd",
+                    "btc",
+                    "eth",
+                    "bnb",
+                    "matic",
+                    "xaut",
+                    "paxg",
                 ],
             },
             "usdc": 0.3,

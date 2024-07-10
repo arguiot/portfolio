@@ -13,10 +13,10 @@ from main_backtest.create_portfolios import create_portfolios
 
 # Define scenarios
 scenarios = {
-    "stress_1": {
-        "start_date": pd.to_datetime("2020-06-26"),
-        "end_date": pd.to_datetime("2024-06-26"),
-    },
+    # "stress_1": {
+    #     "start_date": pd.to_datetime("2020-06-26"),
+    #     "end_date": pd.to_datetime("2024-06-26"),
+    # },
     "stress_2": {
         "start_date": pd.to_datetime("2021-06-26"),
         "end_date": pd.to_datetime("2024-06-26"),
@@ -35,7 +35,8 @@ scenarios = {
     # },
 }
 
-lookback_period = 180  # 120 days
+lookback_period = 120  # 120 days
+
 daily_trade_generator = False
 
 
