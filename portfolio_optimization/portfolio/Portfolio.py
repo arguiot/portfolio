@@ -159,6 +159,7 @@ class Portfolio:
         assert np.isclose(new_weights.sum(), 1, 1e-5), (
             f"Sum of raw weights is {new_weights.sum()}, "
             f"but expected value is 1. Portfolio name: {self.optimiser}"
+            f"Assets: {self.latest_optimiser.df.columns}"
         )
 
         self.weights = new_weights

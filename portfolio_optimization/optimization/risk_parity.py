@@ -93,6 +93,22 @@ class RiskParity(GeneralOptimization):
             if asset not in self.asset_constraints:
                 self.asset_constraints[asset] = (0, default_max)
 
+        # If no sector constraints, adjust if assets are missing
+        if not self.sector_constraints or self.sector_constraints == {}:
+            sum_weights = sum(
+                self.asset_constraints[asset][1] for asset in available_assets
+            )
+            if sum_weights < 1:
+                adjustment_factor = 1 / sum_weights
+                for asset in available_assets:
+                    original_max = self.max_weights.get(asset, default_max)
+                    adjusted_max = max(
+                        min(original_max * adjustment_factor, 1.0),
+                        1 / (self.df.shape[1] - 1),
+                    )
+                    self.asset_constraints[asset] = (0, adjusted_max)
+                    print(f"Adjusted constraint for {asset}: (0, {adjusted_max})")
+
         for sector, details in self.sector_constraints.items():
             sector_assets = details["assets"]
             original_assets_count = len(details["original_assets"])
@@ -103,7 +119,7 @@ class RiskParity(GeneralOptimization):
                     original_max = self.max_weights.get(asset, default_max)
                     adjusted_max = max(
                         min(original_max * adjustment_factor, 1.0),
-                        1 / (available_assets_count - 1),
+                        1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
                     print(
@@ -115,7 +131,7 @@ class RiskParity(GeneralOptimization):
                     sector_allocation = details["allocation"]
                     adjusted_max = max(
                         min(original_max / sector_allocation, 1.0),
-                        1 / (available_assets_count - 1),
+                        1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
                     print(
@@ -174,7 +190,7 @@ class RiskParity(GeneralOptimization):
         objective = cp.Minimize(risk * 1000)
         prob = cp.Problem(objective, constraints)
 
-        for solver in ["MOSEK", "CLARABEL", "SCS", "ECOS_BB"]:
+        for solver in ["SCS", "ECOS_BB", "MOSEK", "CLARABEL"]:
             try:
                 prob.solve(solver=solver, verbose=True)
                 if w.value is not None:
@@ -244,7 +260,13 @@ class RiskParity(GeneralOptimization):
 
             final_weights = self.merge_sector_portfolios(sector_portfolios)
         else:
-            final_weights = self._optimize_risk_parity()
+            try:
+                final_weights = self.optimize_sector_portfolio(self.valid_assets, 1)
+            except Exception as e:
+                print(f"Failed to optimize portfolio: {str(e)}")
+                return pd.Series()
+
+        print(f"Final weights: {final_weights}")
 
         return pd.Series(final_weights).sort_index()
 
@@ -307,7 +329,7 @@ class RiskParity(GeneralOptimization):
         objective = cp.Minimize(risk * 1000)
         prob = cp.Problem(objective, constraints)
 
-        for solver in ["MOSEK", "CLARABEL", "SCS", "ECOS_BB"]:
+        for solver in ["SCS", "ECOS_BB", "MOSEK", "CLARABEL"]:
             try:
                 prob.solve(solver=solver, verbose=True)
                 if w.value is not None:

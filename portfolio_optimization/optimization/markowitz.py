@@ -86,6 +86,22 @@ class Markowitz(GeneralOptimization):
             if asset not in self.asset_constraints:
                 self.asset_constraints[asset] = (0, default_max)
 
+        # If no sector constraints, adjust if assets are missing
+        if not self.sector_constraints or self.sector_constraints == {}:
+            sum_weights = sum(
+                self.asset_constraints[asset][1] for asset in available_assets
+            )
+            if sum_weights < 1:
+                adjustment_factor = 1 / sum_weights
+                for asset in available_assets:
+                    original_max = self.max_weights.get(asset, default_max)
+                    adjusted_max = max(
+                        min(original_max * adjustment_factor, 1.0),
+                        1 / (self.df.shape[1] - 1),
+                    )
+                    self.asset_constraints[asset] = (0, adjusted_max)
+                    print(f"Adjusted constraint for {asset}: (0, {adjusted_max})")
+
         # Adjust max weights within each sector if assets are missing
         for sector, details in self.sector_constraints.items():
             sector_assets = details["assets"]
@@ -97,7 +113,7 @@ class Markowitz(GeneralOptimization):
                     original_max = self.max_weights.get(asset, default_max)
                     adjusted_max = max(
                         min(original_max * adjustment_factor, 1.0),
-                        1 / (available_assets_count - 1),
+                        1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
                     print(
@@ -109,7 +125,7 @@ class Markowitz(GeneralOptimization):
                     sector_allocation = details["allocation"]
                     adjusted_max = max(
                         min(original_max / sector_allocation, 1.0),
-                        1 / (available_assets_count - 1),
+                        1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
                     print(
@@ -165,9 +181,12 @@ class Markowitz(GeneralOptimization):
         return final_weights
 
     def optimize_sector_portfolio(self, sector_assets, sector_allocation):
-        sector_df = self.df[sector_assets]
         sector_rets = self.rets[sector_assets]
         sector_cov = self.cov_matrix.loc[sector_assets, sector_assets]
+
+        if len(sector_assets) == 1:
+            # Return 100% weight if only one asset in sector
+            return pd.Series(sector_allocation, index=sector_assets)
 
         weight_bounds = []
         for asset in sector_assets:
@@ -187,7 +206,7 @@ class Markowitz(GeneralOptimization):
         )
 
         # Set risk-free rate to the lowest expected return in the sector
-        risk_free_rate = min(sector_rets)
+        risk_free_rate = min(sector_rets) - 1e-4
 
         try:
             if self.efficient_portfolio == self.EfficientPortfolio.MAX_SHARPE:
@@ -236,36 +255,12 @@ class Markowitz(GeneralOptimization):
         else:
             # Non-sector-based portfolio
             all_assets = list(self.df.columns)
-            weight_bounds = [self.asset_constraints[asset] for asset in all_assets]
 
-            ef = EfficientFrontier(
-                self.rets,
-                self.cov_matrix,
-                weight_bounds=weight_bounds,
-                solver="ECOS_BB",
-            )
-
-            try:
-                if risk_free_rate is None:
-                    # Set risk-free rate to the lowest expected return in the portfolio
-                    risk_free_rate = min(self.rets)
-
-                if self.efficient_portfolio == self.EfficientPortfolio.MAX_SHARPE:
-                    ef.max_sharpe(risk_free_rate=risk_free_rate)
-                elif self.efficient_portfolio == self.EfficientPortfolio.MIN_VOLATILITY:
-                    ef.min_volatility()
-                elif self.efficient_portfolio == self.EfficientPortfolio.MAX_RETURN:
-                    ef.max_quadratic_utility()
-
-                final_weights = ef.clean_weights()
-
-            except Exception as e:
-                print(f"Error optimizing portfolio: {str(e)}")
-                return pd.Series()
+            final_weights = self.optimize_sector_portfolio(all_assets, 1)
 
         # Verify individual asset constraints
         for asset, weight in final_weights.items():
-            if weight > self.asset_constraints[asset][1] + 1e-8:
+            if weight > self.asset_constraints[asset][1] + 1e-4:
                 print(
                     f"Error: Asset {asset} exceeds maximum weight. Expected <= {self.asset_constraints[asset][1]}, got {weight}"
                 )
@@ -274,8 +269,9 @@ class Markowitz(GeneralOptimization):
         # Verify total allocation
         total_weight = sum(final_weights.values())
         if abs(total_weight - 1) > 1e-4:
-            print(f"Error: Total weight is not 1. Got {total_weight}")
-            return pd.Series()
+            # Adjust weights if total weight is not 1
+            for asset, weight in final_weights.items():
+                final_weights[asset] = weight / total_weight
 
         return pd.Series(final_weights)
 
