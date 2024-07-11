@@ -146,7 +146,7 @@ for (let filePath of filePaths) {
   }
 }
 
-if (os.platform() === 'darwin') {  // Check if it is macOS
+if (os.platform() === 'darwin' && !process.argv.includes('--no-open')) {  // Check if it is macOS
   // Wait for Excel to open all files
   await new Promise(resolve => setTimeout(resolve, 5000));
 

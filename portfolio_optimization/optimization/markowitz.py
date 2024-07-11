@@ -29,7 +29,7 @@ class Markowitz(GeneralOptimization):
         MIN_VOLATILITY = "min_volatility"
         MAX_RETURN = "max_return"
 
-    def __init__(self, df, mcaps=None, cov=None, max_weights=None):
+    def __init__(self, df, mcaps=None, cov=None, max_weights=None, min_weights=None):
         super().__init__(df, mcaps=mcaps)
 
         self.mode = self.CovMode.LEDOIT_WOLF
@@ -38,6 +38,7 @@ class Markowitz(GeneralOptimization):
         self.cov_matrix = cov
         self.rets = None
         self.max_weights = max_weights or {}
+        self.min_weights = min_weights or {}
         self.ef = None
         self.sector_constraints = {}
         self.asset_constraints = {}

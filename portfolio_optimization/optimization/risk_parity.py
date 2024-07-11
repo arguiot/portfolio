@@ -13,11 +13,15 @@ class RiskParity(GeneralOptimization):
         SAMPLE_COV = 1
         LEDOIT_WOLF = 2
 
-    def __init__(self, df: pd.DataFrame, mcaps=None, cov=None, max_weight=None):
+    def __init__(
+        self, df: pd.DataFrame, mcaps=None, cov=None, max_weight=None, min_weight=None
+    ):
         super().__init__(df, mcaps=mcaps)
         self.mode = self.Mode.LEDOIT_WOLF
         self.max_weights = max_weight or {}
-        self.asset_names = list(df.columns)
+        self.min_weights = min_weight or {}
+        self.asset_names = sorted(list(df.columns))  # Sort asset names
+        self.df = df[self.asset_names]  # Reorder DataFrame columns
         self.cov_matrix = cov if cov is not None else self.get_cov_matrix()
         self.budget = {}
         self.returns = None
@@ -30,7 +34,7 @@ class RiskParity(GeneralOptimization):
         self.asset_constraints = {}
 
     def _get_valid_assets(self):
-        return set(self.asset_names)
+        return sorted(list(self.asset_names))
 
     def _process_max_weights(self):
         processed = {}
@@ -54,7 +58,7 @@ class RiskParity(GeneralOptimization):
         self.asset_constraints = {}
         default_max = self.processed_max_weights.get("*", 1.0)
 
-        available_assets = set(self.df.columns)
+        available_assets = list(self.df.columns)
 
         for key, value in self.processed_max_weights.items():
             if isinstance(value, (int, float)):
@@ -192,11 +196,14 @@ class RiskParity(GeneralOptimization):
             for asset, weight in sector_weights.items():
                 final_weights[asset] = weight * sector_allocation
 
-        non_sector_assets = set(self.df.columns) - set(
+        sector_assets = [
             asset
             for details in self.sector_constraints.values()
             for asset in details["assets"]
-        )
+        ]
+        non_sector_assets = [
+            asset for asset in self.df.columns if asset not in sector_assets
+        ]
         if non_sector_assets:
             non_sector_allocation = 1 - sum(
                 details["allocation"] for details in self.sector_constraints.values()
@@ -239,10 +246,11 @@ class RiskParity(GeneralOptimization):
         else:
             final_weights = self._optimize_risk_parity()
 
-        return pd.Series(final_weights)
+        return pd.Series(final_weights).sort_index()
 
     def _optimize_risk_parity(self):
         N = len(self.valid_assets)
+        sorted_assets = sorted(self.valid_assets)  # Sort assets
         w = cp.Variable((N, 1))
         rb = np.ones((N, 1)) / N
         k = cp.Variable((1, 1))
@@ -319,13 +327,13 @@ class RiskParity(GeneralOptimization):
             return fallback.get_weights()
 
         weights = np.abs(w.value) / np.sum(np.abs(w.value))
-        return pd.Series(weights.flatten(), index=self.valid_assets)
+        return pd.Series(weights.flatten(), index=sorted_assets).sort_index()
 
     def validate_constraints(self):
         self.valid_assets = self._get_valid_assets()
         self.processed_max_weights = self._process_max_weights()
 
-        assets_in_constraints = set()
+        assets_in_constraints = set()  # Change this to a set
 
         for key, value in self.processed_max_weights.items():
             if isinstance(value, (int, float)):
@@ -348,24 +356,22 @@ class RiskParity(GeneralOptimization):
                         f"Error: Invalid sum constraint for {key} ({value['sum']}). Must be between 0 and 1."
                     )
                     return False
-                assets_in_constraints.update(
-                    [asset.lower() for asset in value["assets"]]
-                )
+                assets_in_constraints.update(asset.lower() for asset in value["assets"])
 
         for key, value in self.processed_max_weights.items():
             if isinstance(value, dict):
-                class_assets = set([asset.lower() for asset in value["assets"]])
+                class_assets = set(asset.lower() for asset in value["assets"])
                 for other_key, other_value in self.processed_max_weights.items():
                     if other_key != key and isinstance(other_value, dict):
                         other_class_assets = set(
-                            [asset.lower() for asset in other_value["assets"]]
+                            asset.lower() for asset in other_value["assets"]
                         )
                         if class_assets.intersection(other_class_assets):
                             print(
                                 f"Warning: Overlapping assets in class constraints {key} and {other_key}"
                             )
 
-        unconstrained_assets = self.valid_assets - assets_in_constraints
+        unconstrained_assets = set(self.valid_assets) - assets_in_constraints
         if unconstrained_assets and "*" not in self.processed_max_weights:
             print(
                 f"Warning: The following assets have no explicit constraints: {unconstrained_assets}"

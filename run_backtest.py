@@ -11,6 +11,8 @@ from portfolio_optimization.backtesting.parity import (
 )
 from main_backtest.create_portfolios import create_portfolios
 
+np.random.seed(1)
+
 # Define scenarios
 scenarios = {
     # "stress_1": {
@@ -37,7 +39,7 @@ scenarios = {
 
 lookback_period = 120  # 120 days
 
-daily_trade_generator = False
+daily_trade_generator = True
 
 
 def run_for_asset_class(
