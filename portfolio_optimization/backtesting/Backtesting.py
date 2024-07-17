@@ -159,6 +159,7 @@ class Backtest:
                         prices,
                         _current_value,
                         mcaps,
+                        yield_data,
                     )
                 except Exception as e:
                     print(str(e))

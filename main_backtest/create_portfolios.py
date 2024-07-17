@@ -94,7 +94,7 @@ def create_portfolios(
                 ],
             },
             "volatile": {
-                "sum": 0.1,
+                "sum": 0.10,
                 "assets": [
                     "btc",
                     "eth",

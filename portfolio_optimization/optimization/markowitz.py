@@ -42,6 +42,7 @@ class Markowitz(GeneralOptimization):
         self.ef = None
         self.sector_constraints = {}
         self.asset_constraints = {}
+        self.yield_data = None
 
     def process_constraints(self):
         print("\nProcessing constraints:")
@@ -234,6 +235,21 @@ class Markowitz(GeneralOptimization):
             self.rets = expected_returns.mean_historical_return(
                 self.df, log_returns=True
             )
+        if self.yield_data is not None:
+            for asset in self.yield_data.index:
+                if asset not in self.rets.index:
+                    continue
+                # Convert annual yield to daily yield
+                daily_yield = (1 + self.yield_data[asset]) ** (1 / 365) - 1
+
+                # Convert log return to simple return
+                simple_return = np.exp(self.rets[asset]) - 1
+
+                # Add yield to simple return
+                total_return = (1 + simple_return) * (1 + daily_yield) - 1
+
+                # Convert back to log return
+                self.rets[asset] = np.log(1 + total_return)
 
         self.process_constraints()
 

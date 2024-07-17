@@ -25,6 +25,7 @@ class RiskParity(GeneralOptimization):
         self.cov_matrix = cov if cov is not None else self.get_cov_matrix()
         self.budget = {}
         self.returns = None
+        self.yield_data = None
         self.lambda_var = None
         self.lambda_u = None
         self.latest_apy = None
@@ -241,6 +242,22 @@ class RiskParity(GeneralOptimization):
             self.returns = expected_returns.mean_historical_return(
                 self.df, log_returns=True
             )
+
+        if self.yield_data is not None:
+            for asset in self.yield_data.index:
+                if asset not in self.returns.index:
+                    continue
+                # Convert annual yield to daily yield
+                daily_yield = (1 + self.yield_data[asset]) ** (1 / 365) - 1
+
+                # Convert log return to simple return
+                simple_return = np.exp(self.returns[asset]) - 1
+
+                # Add yield to simple return
+                total_return = (1 + simple_return) * (1 + daily_yield) - 1
+
+                # Convert back to log return
+                self.returns[asset] = np.log(1 + total_return)
 
         self.cov_matrix = self.get_cov_matrix()
         self.process_constraints()

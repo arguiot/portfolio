@@ -27,10 +27,10 @@ scenarios = {
         "start_date": pd.to_datetime("2020-05-15"),
         "end_date": pd.to_datetime("2021-11-12"),
     },
-    "bear_market": {
-        "start_date": pd.to_datetime("2021-11-12"),
-        "end_date": pd.to_datetime("2022-11-12"),
-    },
+    # "bear_market": {
+    #     "start_date": pd.to_datetime("2021-11-12"),
+    #     "end_date": pd.to_datetime("2022-11-12"),
+    # },
     "sprint_bull_market": {
         "start_date": pd.to_datetime("2023-06-26"),
         "end_date": pd.to_datetime("2024-06-26"),
@@ -57,6 +57,36 @@ def run_for_asset_class(
         elif asset_class == "low_risk_tickers":
             if asset in ["usdc", "usdt", "dai"]:
                 yield_data[asset] = 0.07
+            if asset == "frax":
+                yield_data[asset] = 0.07
+            if asset == "gho":
+                yield_data[asset] = 0.06
+            if asset == "fdusd":
+                yield_data[asset] = 0.03
+            if asset == "usde":
+                yield_data[asset] = 0.20
+            if asset == "usdd":
+                yield_data[asset] = 0.06
+            if asset == "crvusd":
+                yield_data[asset] = 0.12
+            if asset == "susd":
+                yield_data[asset] = 0.06
+            if asset == "tusd":
+                yield_data[asset] = 0.10
+            if asset == "pyusd":
+                yield_data[asset] = 0.04
+            if asset == "paxg":
+                yield_data[asset] = 0.08
+            if asset == "xaut":
+                yield_data[asset] = 0.0
+            if asset == "btc":
+                yield_data[asset] = 0.0
+            if asset == "eth":
+                yield_data[asset] = 0.07
+            if asset == "bnb":
+                yield_data[asset] = 0.01
+            if asset == "matic":
+                yield_data[asset] = 0.04
 
     perfs = backtest.run_backtest(
         look_back_period=lookback_period,
