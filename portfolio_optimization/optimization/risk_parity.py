@@ -21,11 +21,11 @@ class RiskParity(GeneralOptimization):
         self.max_weights = max_weight or {}
         self.min_weights = min_weight or {}
         self.asset_names = sorted(list(df.columns))  # Sort asset names
+        self.returns = None
+        self.yield_data = None
         self.df = df[self.asset_names]  # Reorder DataFrame columns
         self.cov_matrix = cov if cov is not None else self.get_cov_matrix()
         self.budget = {}
-        self.returns = None
-        self.yield_data = None
         self.lambda_var = None
         self.lambda_u = None
         self.latest_apy = None
@@ -238,27 +238,6 @@ class RiskParity(GeneralOptimization):
                 "Constraints are not mathematically consistent. Please review your max_weight input."
             )
 
-        if self.returns is None:
-            self.returns = expected_returns.mean_historical_return(
-                self.df, log_returns=True
-            )
-
-        if self.yield_data is not None:
-            for asset in self.yield_data.index:
-                if asset not in self.returns.index:
-                    continue
-                # Convert annual yield to daily yield
-                daily_yield = (1 + self.yield_data[asset]) ** (1 / 365) - 1
-
-                # Convert log return to simple return
-                simple_return = np.exp(self.returns[asset]) - 1
-
-                # Add yield to simple return
-                total_return = (1 + simple_return) * (1 + daily_yield) - 1
-
-                # Convert back to log return
-                self.returns[asset] = np.log(1 + total_return)
-
         self.cov_matrix = self.get_cov_matrix()
         self.process_constraints()
 
@@ -422,11 +401,29 @@ class RiskParity(GeneralOptimization):
         pass
 
     def get_cov_matrix(self):
+        self.returns = expected_returns.returns_from_prices(self.df, log_returns=False)
+        if self.yield_data is not None:
+            for asset in self.yield_data.index:
+                if asset not in self.returns.columns:
+                    continue
+
+                # Calculate daily returns
+                daily_yield = (1 + self.yield_data[asset]) ** (1 / 365) - 1
+
+                # Add daily returns to return column
+                self.returns[asset] = self.returns[asset] + daily_yield
+
         if self.mode == self.Mode.SAMPLE_COV:
-            cov = np.array(sample_cov(self.df))
+            cov = np.array(sample_cov(self.returns, returns_data=True, frequency=365))
         elif self.mode == self.Mode.LEDOIT_WOLF:
-            cov = np.array(CovarianceShrinkage(self.df).ledoit_wolf())
-        print(f"Computed covariance matrix shape: {cov.shape}")
+            cov = np.array(
+                CovarianceShrinkage(
+                    self.returns, returns_data=True, frequency=365
+                ).ledoit_wolf()
+            )
+        print(
+            f"Computed covariance matrix shape: {cov.shape}. Returns shape: {self.returns.shape}"
+        )
         return cov
 
     def check_constraints(self, weights):

@@ -233,20 +233,18 @@ class Markowitz(GeneralOptimization):
             self.cov_matrix = self.get_cov_matrix()
         if self.rets is None:
             self.rets = expected_returns.mean_historical_return(
-                self.df, log_returns=True
+                self.df, log_returns=True, frequency=365
             )
         if self.yield_data is not None:
             for asset in self.yield_data.index:
                 if asset not in self.rets.index:
                     continue
-                # Convert annual yield to daily yield
-                daily_yield = (1 + self.yield_data[asset]) ** (1 / 365) - 1
 
                 # Convert log return to simple return
                 simple_return = np.exp(self.rets[asset]) - 1
 
                 # Add yield to simple return
-                total_return = (1 + simple_return) * (1 + daily_yield) - 1
+                total_return = (1 + simple_return) * (1 + self.yield_data[asset]) - 1
 
                 # Convert back to log return
                 self.rets[asset] = np.log(1 + total_return)
@@ -357,4 +355,19 @@ class Markowitz(GeneralOptimization):
     def get_cov_matrix(self):
         if self.df.empty:
             return pd.DataFrame(columns=self.df.columns)
-        return risk_matrix(self.df, method=self.mode.value)
+
+        returns = expected_returns.returns_from_prices(self.df, log_returns=False)
+
+        if self.yield_data is not None:
+            for asset in self.yield_data.index:
+                if asset not in returns.columns:
+                    continue
+
+                # Calculate daily returns
+                daily_yield = (1 + self.yield_data[asset]) ** (1 / 365) - 1
+
+                # Add daily returns to return column
+                returns[asset] = returns[asset] + daily_yield
+        return risk_matrix(
+            returns, method=self.mode.value, returns_data=True, frequency=365
+        )

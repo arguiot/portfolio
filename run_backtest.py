@@ -15,26 +15,26 @@ np.random.seed(1)
 
 # Define scenarios
 scenarios = {
-    "stress_1": {
-        "start_date": pd.to_datetime("2020-06-26"),
-        "end_date": pd.to_datetime("2024-06-26"),
-    },
-    "stress_2": {
-        "start_date": pd.to_datetime("2021-06-26"),
-        "end_date": pd.to_datetime("2024-06-26"),
-    },
-    "bull_market": {
-        "start_date": pd.to_datetime("2020-05-15"),
-        "end_date": pd.to_datetime("2021-11-12"),
-    },
-    # "bear_market": {
-    #     "start_date": pd.to_datetime("2021-11-12"),
-    #     "end_date": pd.to_datetime("2022-11-12"),
+    # "stress_1": {
+    #     "start_date": pd.to_datetime("2020-06-26"),
+    #     "end_date": pd.to_datetime("2024-06-26"),
     # },
-    "sprint_bull_market": {
-        "start_date": pd.to_datetime("2023-06-26"),
-        "end_date": pd.to_datetime("2024-06-26"),
+    # "stress_2": {
+    #     "start_date": pd.to_datetime("2021-06-26"),
+    #     "end_date": pd.to_datetime("2024-06-26"),
+    # },
+    # "bull_market": {
+    #     "start_date": pd.to_datetime("2020-05-15"),
+    #     "end_date": pd.to_datetime("2021-11-12"),
+    # },
+    "bear_market": {
+        "start_date": pd.to_datetime("2021-11-12"),
+        "end_date": pd.to_datetime("2022-11-12"),
     },
+    # "sprint_bull_market": {
+    #     "start_date": pd.to_datetime("2023-06-26"),
+    #     "end_date": pd.to_datetime("2024-06-26"),
+    # },
 }
 
 lookback_period = 120  # 120 days

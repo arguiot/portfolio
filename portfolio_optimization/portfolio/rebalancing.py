@@ -31,8 +31,8 @@ def optimize_trades(
     # Define new holdings as a variable
     new_holdings = cp.Variable(n_assets)
 
-    min_W = min_W if isinstance(min_W, float) else min_W.values # = 0
-    max_W = max_W if isinstance(max_W, float) else max_W.values # = 1
+    min_W = min_W if isinstance(min_W, float) else min_W.values  # = 0
+    max_W = max_W if isinstance(max_W, float) else max_W.values  # = 1
 
     # Relative weights of the new portfolio
     new_weights = cp.multiply(new_holdings, _prices.values) / projected_portfolio_val
@@ -53,13 +53,19 @@ def optimize_trades(
     )
 
     problem = cp.Problem(objective, constraints)
-    problem.solve(solver=cp.ECOS)
+    solvers = [cp.ECOS, cp.SCS, cp.OSQP, cp.CVXOPT]
+    for solver in solvers:
+        try:
+            problem.solve(solver=solver, verbose=True)
+            if problem.status != cp.INFEASIBLE:
+                break
+        except Exception as e:
+            print(f"Solver {solver} failed with error: {e}")
 
     if problem.status == cp.INFEASIBLE:
         raise Exception(
             f"The problem was not successfully solved! Status: {problem.status}"
         )
-
     # Get new holdings value
     new_holdings = pd.Series(new_holdings.value, index=_prices.index)
     new_holdings_value = (new_holdings * prices).sum()
