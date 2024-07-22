@@ -22,7 +22,6 @@ class RiskParity(GeneralOptimization):
         self.min_weights = min_weight or {}
         self.asset_names = sorted(list(df.columns))  # Sort asset names
         self.returns = None
-        self.yield_data = None
         self.df = df[self.asset_names]  # Reorder DataFrame columns
         self.cov_matrix = cov if cov is not None else self.get_cov_matrix()
         self.budget = {}
@@ -401,29 +400,11 @@ class RiskParity(GeneralOptimization):
         pass
 
     def get_cov_matrix(self):
-        self.returns = expected_returns.returns_from_prices(self.df, log_returns=False)
-        if self.yield_data is not None:
-            for asset in self.yield_data.index:
-                if asset not in self.returns.columns:
-                    continue
-
-                # Calculate daily returns
-                daily_yield = (1 + self.yield_data[asset]) ** (1 / 365) - 1
-
-                # Add daily returns to return column
-                self.returns[asset] = self.returns[asset] + daily_yield
-
         if self.mode == self.Mode.SAMPLE_COV:
-            cov = np.array(sample_cov(self.returns, returns_data=True, frequency=365))
+            cov = np.array(sample_cov(self.df, frequency=365))
         elif self.mode == self.Mode.LEDOIT_WOLF:
-            cov = np.array(
-                CovarianceShrinkage(
-                    self.returns, returns_data=True, frequency=365
-                ).ledoit_wolf()
-            )
-        print(
-            f"Computed covariance matrix shape: {cov.shape}. Returns shape: {self.returns.shape}"
-        )
+            cov = np.array(CovarianceShrinkage(self.df, frequency=365).ledoit_wolf())
+        print(f"Computed covariance matrix shape: {cov.shape}.")
         return cov
 
     def check_constraints(self, weights):

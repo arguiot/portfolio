@@ -117,9 +117,6 @@ class Portfolio:
         if hasattr(self.latest_optimiser, "min_weight"):
             self.latest_optimiser.min_weights = self.min_weight
 
-        if yield_data is not None and hasattr(self.latest_optimiser, "yield_data"):
-            self.latest_optimiser.yield_data = yield_data
-
         new_weights = self.latest_optimiser.get_weights()
         self.raw_weights = new_weights.copy()
 

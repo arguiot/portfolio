@@ -12,6 +12,7 @@ from typing import Dict, List
 from pandas.core.frame import DataFrame, Series
 from .delegate import BacktestingDelegate
 from datetime import datetime
+from pypfopt import expected_returns
 
 
 class PortfolioPerformance:
@@ -140,9 +141,6 @@ class Backtest:
     ):
         for date in total_dates:
             prices = self.price_data.loc[date]
-            # Apply the daily yield to the portfolio
-            if yield_data is not None:
-                portfolio.apply_yield(yield_data, compounded=True)
             self.portfolio_values[name].loc[date, "Portfolio Value"] = portfolio.value(
                 prices
             )
@@ -193,6 +191,45 @@ class Backtest:
             self.portfolio_metrics[name],
         )
 
+    # Utils
+    def returns_from_prices(self, prices, log_returns=False):
+        """
+        Calculate the returns given prices.
+
+        :param prices: adjusted (daily) closing prices of the asset, each row is a
+                    date and each column is a ticker/id.
+        :type prices: pd.DataFrame
+        :param log_returns: whether to compute using log returns
+        :type log_returns: bool, defaults to False
+        :return: (daily) returns
+        :rtype: pd.DataFrame
+        """
+        if log_returns:
+            returns = np.log(1 + prices.pct_change())
+        else:
+            returns = prices.pct_change()
+        return returns
+
+    def prices_from_returns(self, returns, log_returns=False):
+        """
+        Calculate the pseudo-prices given returns. These are not true prices because
+        the initial prices are all set to 1, but it behaves as intended when passed
+        to any PyPortfolioOpt method.
+
+        :param returns: (daily) percentage returns of the assets
+        :type returns: pd.DataFrame
+        :param log_returns: whether to compute using log returns
+        :type log_returns: bool, defaults to False
+        :return: (daily) pseudo-prices.
+        :rtype: pd.DataFrame
+        """
+        if log_returns:
+            ret = np.exp(returns)
+        else:
+            ret = 1 + returns
+        ret.iloc[0] = 1  # set first day pseudo-price
+        return ret.cumprod()
+
     def run_backtest(
         self,
         look_back_period=4,
@@ -204,6 +241,66 @@ class Backtest:
         rebalance_dates = pd.date_range(
             start=self.start_date, end=self.end_date, freq=self.rebalance_frequency
         )
+
+        if yield_data is not None:
+            returns = self.returns_from_prices(self.price_data, log_returns=False)
+
+            for asset in yield_data.index:
+                if asset not in self.price_data.columns:
+                    continue
+                daily_yield = (1 + yield_data[asset]) ** (1 / 365) - 1
+
+                # Shift the yield by one day
+                shifted_yield = pd.Series(daily_yield, index=returns.index).shift(1)
+                returns[asset] = returns[asset] + shifted_yield
+
+            # Remove the first row of returns as it now contains NaN from the shift
+            returns = returns.iloc[1:]
+
+            # Calculate cumulative returns
+            cumulative_returns = (1 + returns).cumprod()
+
+            # Initialize new_prices with the same structure as self.price_data
+            new_prices = pd.DataFrame(
+                index=self.price_data.index, columns=self.price_data.columns
+            )
+
+            for asset in self.price_data.columns:
+                # Find the first non-NaN price for each asset
+                first_valid_index = self.price_data[asset].first_valid_index()
+                if first_valid_index is not None:
+                    initial_price = self.price_data.loc[first_valid_index, asset]
+
+                    # Calculate new prices using the initial price and cumulative returns
+                    asset_cumulative_returns = cumulative_returns[asset].reindex(
+                        new_prices.index
+                    )
+                    new_prices[asset] = asset_cumulative_returns * initial_price
+
+                    # Preserve NaN values at the beginning
+                    new_prices.loc[:first_valid_index, asset] = self.price_data.loc[
+                        :first_valid_index, asset
+                    ]
+
+            self.price_data = new_prices
+            # Rebalance the portfolios
+            for name, portfolio in self.portfolios.items():
+                start = self.start_date
+                dataf = self.price_data.loc[:start]
+                current_prices = dataf.iloc[-1]
+
+                print(f"Rebalancing {name}")
+                print(f"Current Prices: {current_prices}")
+                print(f"Base Value: {portfolio.base_value}")
+                print(f"DataFrame: {dataf}")
+
+                portfolio.rebalance(
+                    df=dataf,
+                    current_prices=current_prices,
+                    base_value=portfolio.base_value,
+                    mcaps=self.mcaps,
+                    yield_data=yield_data,
+                )
 
         portfolio_performances = []
 

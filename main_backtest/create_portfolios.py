@@ -62,25 +62,27 @@ def create_portfolios(
     # Specify per asset as well
     max_weight = {"*": 1.0}  # "*" key must be higher than the rest.
     if asset_class == "high_risk_tickers":
-        max_weight = {
-            "*": 0.15,
-            "avax": 0.05,
-            "ftm": 0.05,
-            "mkr": 0.05,
-            "ondo": 0.05,
-            "pendle": 0.05,
-            "kas": 0.05,
-        }
+        # max_weight = {
+        #     "*": 0.15,
+        #     "avax": 0.05,
+        #     "ftm": 0.05,
+        #     "mkr": 0.05,
+        #     "ondo": 0.05,
+        #     "pendle": 0.05,
+        #     "kas": 0.05,
+        # }
+        max_weight = {"*": 1.0}
     elif asset_class == "medium_risk_tickers":
-        max_weight = {"*": 0.03}
+        # max_weight = {"*": 0.03}
+        max_weight = {"*": 1.0}
     elif asset_class == "low_risk_tickers":
         max_weight = {
             "classA": {
-                "sum": 0.675,
+                "sum": 0.50,
                 "assets": ["usdc", "usdt", "dai"],
             },
             "classB": {
-                "sum": 0.3,
+                "sum": 0.45,
                 "assets": [
                     "frax",
                     "gho",
@@ -94,7 +96,7 @@ def create_portfolios(
                 ],
             },
             "volatile": {
-                "sum": 0.025,
+                "sum": 0.05,
                 "assets": [
                     "btc",
                     "eth",
@@ -104,24 +106,24 @@ def create_portfolios(
                     "paxg",
                 ],
             },
-            "usdc": 0.3,
-            "usdt": 0.3,
-            "dai": 0.3,
-            "frax": 0.05,
-            "gho": 0.05,
-            "usdd": 0.05,
-            "fdusd": 0.05,
-            "usde": 0.05,
-            "crvusd": 0.05,
-            "susd": 0.05,
-            "tusd": 0.05,
-            "pyusd": 0.05,
-            "btc": 0.07,
-            "eth": 0.07,
-            "bnb": 0.07,
-            "matic": 0.07,
-            "xaut": 0.07,
-            "paxg": 0.07,
+            "usdc": 0.2,
+            "usdt": 0.2,
+            "dai": 0.2,
+            "frax": 0.10,
+            "gho": 0.10,
+            "usdd": 0.10,
+            "fdusd": 0.10,
+            "usde": 0.10,
+            "crvusd": 0.10,
+            "susd": 0.10,
+            "tusd": 0.10,
+            "pyusd": 0.10,
+            "btc": 0.10,
+            "eth": 0.10,
+            "bnb": 0.10,
+            "matic": 0.10,
+            "xaut": 0.10,
+            "paxg": 0.10,
             "*": 1.0,
         }
         # Sum of cash = 90%
