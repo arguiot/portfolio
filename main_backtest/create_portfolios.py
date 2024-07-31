@@ -36,6 +36,7 @@ def create_portfolios(
     lookback_period=120,
     rebalance_frequency="1W",
     daily_trade_generator=True,
+    initial_cash=1000000.0,
 ):
     _df = get_historical_prices_for_assets(
         asset_list[asset_class],
@@ -62,19 +63,19 @@ def create_portfolios(
     # Specify per asset as well
     max_weight = {"*": 1.0}  # "*" key must be higher than the rest.
     if asset_class == "high_risk_tickers":
-        # max_weight = {
-        #     "*": 0.15,
-        #     "avax": 0.05,
-        #     "ftm": 0.05,
-        #     "mkr": 0.05,
-        #     "ondo": 0.05,
-        #     "pendle": 0.05,
-        #     "kas": 0.05,
-        # }
-        max_weight = {"*": 1.0}
+        max_weight = {
+            "*": 0.15,
+            "avax": 0.05,
+            "ftm": 0.05,
+            "mkr": 0.05,
+            "ondo": 0.05,
+            "pendle": 0.05,
+            "kas": 0.05,
+        }
+        # max_weight = {"*": 1.0}
     elif asset_class == "medium_risk_tickers":
-        # max_weight = {"*": 0.03}
-        max_weight = {"*": 1.0}
+        max_weight = {"*": 0.03}
+        # max_weight = {"*": 1.0}
     elif asset_class == "low_risk_tickers":
         max_weight = {
             "classA": {
@@ -148,7 +149,7 @@ def create_portfolios(
     elif asset_class == "low_risk_tickers":
         budget = {}
 
-    initial_bid = 10000.0
+    initial_bid = initial_cash
 
     chosen_delegate = OptRebalancingPortfolioDelegate()
     # HeuristicRebalancingPortfolioDelegate()

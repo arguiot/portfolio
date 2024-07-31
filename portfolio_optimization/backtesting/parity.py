@@ -7,6 +7,7 @@ from portfolio_optimization.portfolio import Portfolio
 from .Backtesting import PortfolioPerformance
 from ..optimization.risk_parity import RiskParity
 from .delegate import BacktestingDelegate
+from enum import Enum
 
 
 class ParityLine:
@@ -124,14 +125,18 @@ class ParityLine:
         self.weight_A, self.weight_B = weight_A, weight_B
 
     def convertRisk(self, risk):
-        assert (
+        if not (
             (risk >= self.getMinRisk())
             and (risk <= self.getMaxRisk())
             or (
                 np.isclose(risk, self.getMinRisk(), rtol=1e-5)
                 or np.isclose(risk, self.getMaxRisk(), rtol=1e-5)
             )
-        ), f"Risk {risk} is not between {self.getMinRisk()} and {self.getMaxRisk()}"
+        ):
+            if risk < self.getMinRisk():
+                risk = self.getMinRisk()
+            elif risk > self.getMaxRisk():
+                risk = self.getMaxRisk()
         _return = (self.a * risk) + self.b
         weights = self._calculateWeights(_return)
         return _return, weights
@@ -183,12 +188,39 @@ class ParityLine:
         return 0
 
 
+class ParityProcessorDelegate:
+    class RiskMode(Enum):
+        LOW_RISK = 0
+        MEDIUM_RISK = 1
+        HIGH_RISK = 2
+
+    def __init__(self, mode):
+        if mode == self.RiskMode.LOW_RISK:
+            self.risk = 0.15
+        elif mode == self.RiskMode.MEDIUM_RISK:
+            self.risk = 0.40
+        elif mode == self.RiskMode.HIGH_RISK:
+            self.risk = 0.60
+
+    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        _return, weights = parity_line.convertRisk(self.risk)
+        print(f"Weights: {weights}")
+        print(f"Return: {_return}")
+        # List all the attributes of the parity line
+        print("[PARITY LINE]")
+        for attr in dir(parity_line):
+            print(f"    {attr}: {getattr(parity_line, attr)}")
+        return pd.Series(weights)
+
+
 class ParityBacktestingProcessor:
     def __init__(
         self,
         portfolio_a: PortfolioPerformance,
         portfolio_b: PortfolioPerformance,
         portfolio_g: PortfolioPerformance,
+        parity_lookback_period: int | None = 90,
+        mode=ParityProcessorDelegate.RiskMode.LOW_RISK,
     ):
         self.parity_line = ParityLine()
 
@@ -200,16 +232,19 @@ class ParityBacktestingProcessor:
         self.values = pd.DataFrame(columns=["Portfolio Value"])
         self.holdings = pd.Series(name="Holdings")
 
-        self.delegate = ParityProcessorDelegate()
+        self.parity_lookback_period = parity_lookback_period
+
+        self.delegate = ParityProcessorDelegate(mode)
 
     def rebalance_line(self, up_to: datetime | None = None):
         assert self.portfolio_a is not None
         assert self.portfolio_b is not None
         assert self.portfolio_g is not None
+
         self.parity_line.regression(
-            self.portfolio_a.up_to(up_to),
-            self.portfolio_b.up_to(up_to),
-            self.portfolio_g.up_to(up_to),
+            self.portfolio_a.up_to(up_to, look_back_period=self.parity_lookback_period),
+            self.portfolio_b.up_to(up_to, look_back_period=self.parity_lookback_period),
+            self.portfolio_g.up_to(up_to, look_back_period=self.parity_lookback_period),
         )
 
     def backtest(self, initial_cash: float = 1000000.0):
@@ -228,6 +263,8 @@ class ParityBacktestingProcessor:
             self.portfolio_b.portfolio_value.index[0],
             self.portfolio_g.portfolio_value.index[0],
         )
+        if self.parity_lookback_period is not None:
+            start_date += timedelta(days=self.parity_lookback_period)
         end_date = min(
             self.portfolio_a.portfolio_value.index[-1],
             self.portfolio_b.portfolio_value.index[-1],
@@ -236,66 +273,83 @@ class ParityBacktestingProcessor:
 
         self.values.loc[start_date] = initial_cash
 
-        current_date = start_date + timedelta(days=1)
+        current_date = start_date
+        last_rebalance_date = None
         while current_date <= end_date:
+            prices = np.array(
+                [
+                    self.portfolio_a.portfolio_value.loc[current_date],
+                    self.portfolio_b.portfolio_value.loc[current_date],
+                    self.portfolio_g.portfolio_value.loc[current_date],
+                ]
+            ).flatten()
             try:
-                # Soft rebalance everyday
-                self.rebalance_line(current_date)
-                # Rebalance the ParityLine every week
-                if current_date.weekday() == 0:  # Monday
-                    self.parity_line.regression(
-                        self.portfolio_a.up_to(current_date),
-                        self.portfolio_b.up_to(current_date),
-                        self.portfolio_g.up_to(current_date),
+                if last_rebalance_date is None or (
+                    self.parity_lookback_period is not None
+                    and (current_date - last_rebalance_date).days
+                    >= self.parity_lookback_period
+                ):
+                    if self.parity_lookback_period is not None:
+                        self.rebalance_line(current_date)
+                    else:
+                        self.rebalance_line(end_date)
+                    last_rebalance_date = current_date
+
+                    # Convert the ParityLine to weights
+                    weights = self.delegate.compute_weights(self.parity_line)
+                    assert sum(weights) == 1, f"Weights do not sum to 1: {sum(weights)}"
+                    print(f"Weights: {weights}")
+                    self.weights.loc[current_date] = weights
+
+                    # Convert the weights to holdings
+                    # Last value of the portfolio
+                    last_value = (
+                        self.values.iloc[-1]["Portfolio Value"]
+                        if len(self.values) > 0
+                        else initial_cash
+                    )
+                    if last_value == 0 or np.isnan(last_value):
+                        last_value = initial_cash
+
+                    print(
+                        f"[Parity] Last value: {last_value}, last iloc: {self.values.iloc[-1]}",
+                        f"Current date: {current_date}, last iloc date: {self.values.iloc[-1].name}",
+                        "----------",  # Separator, because pandas makes it hard to read
                     )
 
-                # Convert the ParityLine to weights
-                weights = self.delegate.compute_weights(self.parity_line)
-                assert sum(weights) == 1, f"Weights do not sum to 1: {sum(weights)}"
-                print(f"Weights: {weights}")
-                self.weights.loc[current_date] = weights
+                    # Allocate the cash to each portfolio
 
-                # Convert the weights to holdings
-                # Last value of the portfolio
-                last_value = (
-                    self.values.iloc[-1]["Portfolio Value"]
-                    if len(self.values) > 0
-                    else initial_cash
-                )
-                if last_value == 0 or np.isnan(last_value):
-                    last_value = initial_cash
-                # Allocate the cash to each portfolio
-                self.holdings.loc[current_date] = last_value * weights
-                # Update the portfolio value based on the current prices
-                print(f"Date: {current_date}")
-                print(
-                    f"Portfolio A: {self.portfolio_a.portfolio_value.loc[current_date]}"
-                )
-                print(
-                    f"Portfolio B: {self.portfolio_b.portfolio_value.loc[current_date]}"
-                )
-                print(
-                    f"Portfolio G: {self.portfolio_g.portfolio_value.loc[current_date]}"
-                )
-                _value = (
-                    self.portfolio_a.portfolio_value.loc[current_date] * weights[0]
-                    + self.portfolio_b.portfolio_value.loc[current_date] * weights[1]
-                    + self.portfolio_g.portfolio_value.loc[current_date] * weights[2]
-                )
-
-                print(f"Value: {_value}")
-
-                self.values.loc[current_date] = _value
-                # Debug, we want last value, weights and holdings to be printed
-                print(
-                    f"Last Value: {last_value}, Weights: {weights}, Holdings: {self.holdings.loc[current_date]}"
-                )
+                    self.holdings.loc[current_date] = (
+                        last_value * np.array(weights.array) / prices
+                    )
+                    # Update the portfolio value based on the current prices
+                    print(f"Date: {current_date}")
+                    print(
+                        f"Portfolio A: {self.portfolio_a.portfolio_value.loc[current_date]}"
+                    )
+                    print(
+                        f"Portfolio B: {self.portfolio_b.portfolio_value.loc[current_date]}"
+                    )
+                    print(
+                        f"Portfolio G: {self.portfolio_g.portfolio_value.loc[current_date]}"
+                    )
+                    print(
+                        f"Prices: {prices}, Parity Holdings: {self.holdings.loc[current_date]}"
+                    )
 
             except AssertionError as e:
                 import traceback
 
                 traceback.print_exc()
                 print(e)
+
+            _value = prices * self.holdings.iloc[-1]  # Last holdings
+
+            print(f"Value: {_value}")
+
+            # If the date doesn't exist, this will create a new row
+            self.values.at[current_date, "Portfolio Value"] = _value.sum()
+            print(f"[Parity] Value updated at {current_date}: {_value.sum()}")
 
             current_date += timedelta(days=1)
 
@@ -307,19 +361,25 @@ class ParityBacktestingProcessor:
             portfolio_compositions=self.weights,
             portfolio_raw_composition=self.weights,
             portfolio_holdings=self.holdings,
+            portfolio_live_weights=self.weights,
         )
 
     def price_data(self):
         price_data = pd.DataFrame()
-        price_data["Alpha"] = self.portfolio_a.portfolio_value["Portfolio Value"]
-        price_data["Beta"] = self.portfolio_b.portfolio_value["Portfolio Value"]
-        price_data["Gamma"] = self.portfolio_g.portfolio_value["Portfolio Value"]
+        start_date = max(
+            self.portfolio_a.portfolio_value.index[0],
+            self.portfolio_b.portfolio_value.index[0],
+            self.portfolio_g.portfolio_value.index[0],
+        )
+        if self.parity_lookback_period is not None:
+            start_date += timedelta(days=self.parity_lookback_period)
+        price_data["Alpha"] = self.portfolio_a.portfolio_value["Portfolio Value"].loc[
+            start_date:
+        ]
+        price_data["Beta"] = self.portfolio_b.portfolio_value["Portfolio Value"].loc[
+            start_date:
+        ]
+        price_data["Gamma"] = self.portfolio_g.portfolio_value["Portfolio Value"].loc[
+            start_date:
+        ]
         return price_data
-
-
-class ParityProcessorDelegate:
-    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
-        _return = parity_line.getMinReturn()
-        print(f"Min Return: {_return}")
-        weights = parity_line.convertReturn(_return)[1:]
-        return pd.Series(weights)

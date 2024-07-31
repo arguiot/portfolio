@@ -135,7 +135,10 @@ class Portfolio:
             df_rest = df.drop(new_weights.index, axis=1)
             mcaps_rest = None
             if mcaps is not None:
-                mcaps_rest = mcaps.drop(new_weights.index, axis=0)
+                try:
+                    mcaps_rest = mcaps.drop(new_weights.index, axis=0)
+                except:
+                    print(f"Failed to drop {new_weights.index} from mcaps: {mcaps}")
 
             if df_rest.shape[1] == 1:
                 # We set the weight to the remaining weight (1 - sum of weights)

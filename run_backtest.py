@@ -8,6 +8,8 @@ from portfolio_optimization.utils import ProgressLogger
 from portfolio_optimization.backtesting.Backtesting import Backtest
 from portfolio_optimization.backtesting.parity import (
     ParityLine,
+    ParityBacktestingProcessor,
+    ParityProcessorDelegate,
 )
 from main_backtest.create_portfolios import create_portfolios
 
@@ -22,7 +24,7 @@ scenarios = {
     # "stress_2": {
     #     "start_date": pd.to_datetime("2021-06-26"),
     #     "end_date": pd.to_datetime("2024-06-26"),
-    # },
+    # # },
     # "bull_market": {
     #     "start_date": pd.to_datetime("2020-05-15"),
     #     "end_date": pd.to_datetime("2021-11-12"),
@@ -39,7 +41,11 @@ scenarios = {
 
 lookback_period = 120  # 120 days
 
+parity_lookback_period = 90  # 90 days
+
 daily_trade_generator = False
+
+initial_cash = 10000.0
 
 
 def run_for_asset_class(
@@ -47,6 +53,7 @@ def run_for_asset_class(
     rebalance_frequency="1D",
     progress_logger=None,
     scenario_tag=None,
+    parity_lookback_period=parity_lookback_period,
 ):
     yield_data = pd.Series()
     for asset in asset_list[asset_class]:
@@ -101,9 +108,30 @@ def run_for_asset_class(
     tag = f"{scenario_tag}_lookback_{lookback_period}"
     filename = f"backtest_results_{asset_class}_{tag}.xlsx"
 
-    backtest.export_results(perfs, f"./out/{rebalance_frequency}/", filename)
+    # Truncate the backtest to the start date
+    _perfs = list(
+        map(
+            lambda perf: perf.starting_from(
+                perf.rebalance_dates[0] + pd.Timedelta(days=parity_lookback_period)
+            ).scale_at_date(
+                perf.rebalance_dates[0] + pd.Timedelta(days=parity_lookback_period),
+                initial_cash,
+            ),
+            perfs,
+        )
+    )
 
-    return perfs
+    backtest.export_results(_perfs, f"./out/{rebalance_frequency}/", filename)
+
+    return list(
+        map(
+            lambda perf: perf.scale_at_date(
+                perf.rebalance_dates[0] + pd.Timedelta(days=parity_lookback_period),
+                initial_cash,
+            ),
+            perfs,
+        )
+    )
 
 
 if __name__ == "__main__":
@@ -121,7 +149,7 @@ if __name__ == "__main__":
 
     for scenario, dates in scenarios.items():
         print(f"Running scenario: {scenario}")
-        start_date = dates["start_date"]
+        start_date = dates["start_date"] - pd.Timedelta(days=parity_lookback_period)
         end_date = dates["end_date"]
 
         if "--class" in sys.argv:
@@ -135,12 +163,14 @@ if __name__ == "__main__":
                 lookback_period=lookback_period,
                 rebalance_frequency=rebalance_frequency,
                 daily_trade_generator=daily_trade_generator,
+                initial_cash=initial_cash,
             )
             run_for_asset_class(
                 backtest=backtest,
                 rebalance_frequency=rebalance_frequency,
                 progress_logger=progress_logger,
                 scenario_tag=scenario,
+                parity_lookback_period=parity_lookback_period,
             )
         else:
             asset_classes = [
@@ -162,6 +192,7 @@ if __name__ == "__main__":
                     lookback_period=lookback_period,
                     rebalance_frequency=rebalance_frequency,
                     daily_trade_generator=daily_trade_generator,
+                    initial_cash=initial_cash,
                 )
                 backtests.append(backtest)
                 loggers.append(logger)
@@ -175,36 +206,60 @@ if __name__ == "__main__":
                     rebalance_frequency=rebalance_frequency,
                     progress_logger=logger,
                     scenario_tag=scenario,
+                    parity_lookback_period=parity_lookback_period,
                 )
                 risk_parity = next(
                     result for result in results if result.name == "Risk Parity"
                 )
                 perfs.append(risk_parity)
 
-            # parity_line = ParityLine()
-            # parity_line.regression(perfs[0], perfs[1], perfs[2])
+            # Run the risk parity backtest for each risk mode
+            for risk_mode in [
+                ParityProcessorDelegate.RiskMode.LOW_RISK,
+                ParityProcessorDelegate.RiskMode.MEDIUM_RISK,
+                ParityProcessorDelegate.RiskMode.HIGH_RISK,
+            ]:
+                print(f"Running risk parity for risk mode: {risk_mode.name}")
+                parity_processor = ParityBacktestingProcessor(
+                    perfs[0],
+                    perfs[1],
+                    perfs[2],
+                    parity_lookback_period=parity_lookback_period,
+                    mode=risk_mode,
+                )
+                parity_processor.delegate = ParityProcessorDelegate(risk_mode)
+                parity_perf = parity_processor.backtest(initial_cash=initial_cash)
+                backtests[0].price_data = parity_processor.price_data()
+                backtests[0].export_results(
+                    performances=[parity_perf],
+                    folder_path=f"./out/{rebalance_frequency}",
+                    file_name=f"parity_{risk_mode.name}_{scenario}.xlsx",
+                )
 
-            # print(f"[PARITY LINE for {scenario}]:")
-            # print(f"Sigma A: {parity_line.sigma_a}")
-            # print(f"Sigma B: {parity_line.sigma_b}")
-            # print(f"Sigma C: {parity_line.sigma_c}")
-            # print(f"Return A: {parity_line.r_a}")
-            # print(f"Return B: {parity_line.r_b}")
-            # print(f"Return C: {parity_line.r_c}")
-            # print(f"Weight A: {parity_line.weight_A}")
-            # print(f"Weight B: {parity_line.weight_B}")
+                # Redo it with parity lookback period = None
+                parity_processor = ParityBacktestingProcessor(
+                    perfs[0].starting_from(
+                        perfs[0].rebalance_dates[0]
+                        + pd.Timedelta(days=parity_lookback_period)
+                    ),
+                    perfs[1].starting_from(
+                        perfs[1].rebalance_dates[0]
+                        + pd.Timedelta(days=parity_lookback_period)
+                    ),
+                    perfs[2].starting_from(
+                        perfs[2].rebalance_dates[0]
+                        + pd.Timedelta(days=parity_lookback_period)
+                    ),
+                    parity_lookback_period=None,
+                    mode=risk_mode,
+                )
+                parity_processor.delegate = ParityProcessorDelegate(risk_mode)
+                parity_perf = parity_processor.backtest(initial_cash=initial_cash)
+                backtests[0].price_data = parity_processor.price_data()
+                backtests[0].export_results(
+                    performances=[parity_perf],
+                    folder_path=f"./out/{rebalance_frequency}",
+                    file_name=f"parity_{risk_mode.name}_{scenario}_no_parity_lookback.xlsx",
+                )
 
-    # parity_processor = ParityBacktestingProcessor(
-    #     perfs[0],
-    #     perfs[1],
-    #     perfs[2],
-    # )
-    # parity_processor.delegate = CustomParityDelegate()
-    # parity_perf = parity_processor.backtest(initial_cash=3000)
-    # backtests[0].price_data = parity_processor.price_data()
-    # backtests[0].export_results(
-    #     performances=[parity_perf],
-    #     folder_path=f"./out/{rebalance_frequency}",
-    #     file_name="parity.xlsx",
-    # )
     progress_logger.delete()

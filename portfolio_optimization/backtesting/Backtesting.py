@@ -44,27 +44,79 @@ class PortfolioPerformance:
             )
         return decomposed
 
-    def up_to(self, end_date: datetime | None = None):
+    def up_to(
+        self, end_date: datetime | None = None, look_back_period: int | None = None
+    ):
         """
         Returns a copy of the PortfolioPerformance object up to the specified end date.
         """
         if end_date is None:
             return self
         end_date = pd.to_datetime(end_date)
+        start_date = (
+            end_date - pd.to_timedelta(look_back_period, unit="D")
+            if look_back_period is not None
+            else self.rebalance_dates[0]
+        )
         return PortfolioPerformance(
             self.name,
-            self.portfolio_value.loc[:end_date],
-            self.rebalance_dates[self.rebalance_dates <= end_date],
-            self.portfolio_compositions.loc[:end_date],
-            self.portfolio_raw_composition.loc[:end_date],
-            self.portfolio_holdings.loc[:end_date],
-            self.portfolio_live_weights.loc[:end_date],
+            self.portfolio_value.loc[start_date:end_date],
+            self.rebalance_dates[
+                (self.rebalance_dates >= start_date)
+                & (self.rebalance_dates <= end_date)
+            ],
+            self.portfolio_compositions.loc[start_date:end_date],
+            self.portfolio_raw_composition.loc[start_date:end_date],
+            self.portfolio_holdings.loc[start_date:end_date],
+            self.portfolio_live_weights.loc[start_date:end_date],
             (
-                self.portfolio_metrics.loc[:end_date]
+                self.portfolio_metrics.loc[start_date:end_date]
                 if self.portfolio_metrics is not None
                 else None
             ),
         )
+
+    def starting_from(self, start_date: datetime | None = None):
+        """
+        Returns a copy of the PortfolioPerformance object starting from the specified start date.
+        """
+        if start_date is None:
+            return self
+        start_date = pd.to_datetime(start_date)
+        return PortfolioPerformance(
+            self.name,
+            self.portfolio_value.loc[start_date:],
+            self.rebalance_dates[self.rebalance_dates >= start_date],
+            self.portfolio_compositions.loc[start_date:],
+            self.portfolio_raw_composition.loc[start_date:],
+            self.portfolio_holdings.loc[start_date:],
+            self.portfolio_live_weights.loc[start_date:],
+            (
+                self.portfolio_metrics.loc[start_date:]
+                if self.portfolio_metrics is not None
+                else None
+            ),
+        )
+
+    def scale_at_date(self, date: datetime, value: float):
+        """
+        Scales the portfolio value at a given date, so that, at that date, the portfolio value is equal to the given value.
+        """
+        if date is None:
+            return self
+
+        value_at_date = self.portfolio_value.loc[date]
+        scale_factor = value / value_at_date
+
+        print(f"Scaling {self.name} by {scale_factor} at {date}")
+
+        # Scale value & holdings
+        self.portfolio_value *= scale_factor
+        self.portfolio_holdings *= scale_factor
+
+        print(f"New value: {self.portfolio_value.loc[date]}")
+
+        return self
 
 
 class Backtest:
