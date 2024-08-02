@@ -10,9 +10,7 @@ from portfolio_optimization.optimization.GeneralOptimization import (
 from portfolio_optimization.optimization.markowitz import Markowitz
 
 from portfolio_optimization.portfolio.delegate import PortfolioDelegate
-from portfolio_optimization.portfolio.rebalancing import (
-    optimize_trades,
-)
+from portfolio_optimization.portfolio.rebalancing import optimal_wealth_trades
 from portfolio_optimization.backtesting.parity import (
     ParityProcessorDelegate,
     ParityLine,
@@ -28,17 +26,37 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
         target_weights: pd.Series,
         base_value,
     ) -> pd.Series:
-        diff = optimize_trades(  # or deterministic_optimal_rebalancing
-            base_value=base_value,
-            holdings=holdings,
-            new_target_weights=target_weights,
-            prices=prices,
-            min_W=target_weights * 0.9,
-            max_W=target_weights * 1.1,
+        # Adjust target wights to have the same dimensions as the holdings
+        shared_index = prices.index.intersection(target_weights.index)
+
+        _prices = prices.reindex(shared_index)
+        _holdings = holdings.reindex(shared_index)
+        _new_target_weights = target_weights.reindex(shared_index)
+
+        # Alphas are the maximum deviation for each assets. Let it be 10%. So we create an array of 10 for each asset.
+        alphas = np.array([10 / 100] * len(_holdings))
+        # Wealth value is the value in $ for each asset. So it's the holdings multiplied by the price.
+        wealth_value = _holdings * _prices
+
+        print("[WEALTH VALUE]: ", wealth_value)
+
+        optimal_wealth_value = optimal_wealth_trades(
+            n_assets=len(_holdings),
+            alphas=alphas,
+            target_weights=_new_target_weights,
+            wealth_value=wealth_value,
+            projected_portfolio_value=base_value,
             external_movement=0,
         )
+        trades = optimal_wealth_value / _prices
 
-        new_holdings = diff + holdings
+        print("[OPTIMAL WEALTH VALUE]: ", optimal_wealth_value)
+        print("[TRADES]: ", trades)
+
+        new_holdings = holdings + trades
+
+        print("[NEW HOLDINGS]: ", new_holdings)
+
         return new_holdings
 
 

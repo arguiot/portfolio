@@ -2,6 +2,91 @@ import numpy as np
 import pandas as pd
 import cvxpy as cp
 from math import ceil
+import cvxopt as opt
+from cvxopt import blas, solvers
+
+
+def optimal_wealth_trades_given_boundaries(
+    n_assets, weights_max, weights_min, wealth_bar, external_movement
+):
+    P = opt.matrix(np.eye(n_assets))
+    q = opt.matrix(-wealth_bar.T)
+
+    G = opt.matrix(np.block([np.eye(n_assets), -np.eye(n_assets)]).T)
+    h = opt.matrix(np.block([weights_max, -weights_min]), tc="d")
+    A = opt.matrix(1.0, (1, n_assets))
+    b = opt.matrix(np.block([external_movement]), tc="d")
+
+    output = solvers.qp(P, q, G, h, A, b)["x"]
+
+    return np.reshape(
+        output,
+        [
+            -1,
+        ],
+    )
+
+
+def optimal_wealth_trades(
+    n_assets,
+    alphas,
+    target_weights,
+    wealth_value,
+    projected_portfolio_value,
+    external_movement,
+):
+
+    tol = 1e-10
+    epsilon = 1e-4
+    bar_alphas = alphas * (1 - epsilon)
+
+    wealth_bar = target_weights * projected_portfolio_value - wealth_value
+
+    weights_max = (
+        target_weights * projected_portfolio_value * (1 + bar_alphas) - wealth_value
+    )
+    weights_min = (
+        target_weights * projected_portfolio_value * (1 - bar_alphas) - wealth_value
+    )
+
+    removed_trades = np.zeros(n_assets, dtype=bool)
+    output_wealth_value = np.copy(wealth_bar)
+
+    for i in range(n_assets):
+
+        try:
+            optimal_wealth_value = optimal_wealth_trades_given_boundaries(
+                n_assets, weights_max, weights_min, wealth_bar, external_movement
+            )
+        except:
+            return output_wealth_value
+
+        optimal_weights = (
+            wealth_value + optimal_wealth_value
+        ) / projected_portfolio_value
+
+        abs_relative_deviation = np.divide(
+            np.abs(target_weights - optimal_weights),
+            target_weights,
+            out=np.float64(np.abs(optimal_weights) > tol),
+            where=(np.abs(target_weights) > tol),
+        )
+
+        max_abs_relative_deviation = np.max(abs_relative_deviation - alphas)
+
+        if max_abs_relative_deviation >= 0:
+            return output_wealth_value
+
+        output_wealth_value = np.copy(optimal_wealth_value)
+        optimal_wealth_value[removed_trades] = np.NaN
+
+        j = np.nanargmin(np.abs(optimal_wealth_value))
+        removed_trades[j] = True
+
+        weights_max[j] = 0
+        weights_min[j] = 0
+
+    return output_wealth_value
 
 
 def optimize_trades(
