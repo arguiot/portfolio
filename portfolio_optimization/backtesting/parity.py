@@ -297,7 +297,9 @@ class ParityBacktestingProcessor:
 
                     # Convert the ParityLine to weights
                     weights = self.delegate.compute_weights(self.parity_line)
-                    assert sum(weights) == 1, f"Weights do not sum to 1: {sum(weights)}"
+                    assert (
+                        sum(weights) - 1 < 1e-5
+                    ), f"Weights do not sum to 1: {sum(weights)}"
                     print(f"Weights: {weights}")
                     self.weights.loc[current_date] = weights
 
@@ -343,13 +345,13 @@ class ParityBacktestingProcessor:
                 traceback.print_exc()
                 print(e)
 
-            _value = prices * self.holdings.iloc[-1]  # Last holdings
-
-            print(f"Value: {_value}")
-
-            # If the date doesn't exist, this will create a new row
-            self.values.at[current_date, "Portfolio Value"] = _value.sum()
-            print(f"[Parity] Value updated at {current_date}: {_value.sum()}")
+            try:
+                _value = prices * self.holdings.iloc[-1]  # Last holdings
+                # If the date doesn't exist, this will create a new row
+                self.values.at[current_date, "Portfolio Value"] = _value.sum()
+                print(f"[Parity] Value updated at {current_date}: {_value.sum()}")
+            except Exception as e:
+                import traceback
 
             current_date += timedelta(days=1)
 

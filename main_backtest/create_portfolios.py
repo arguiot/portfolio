@@ -79,7 +79,7 @@ def create_portfolios(
     elif asset_class == "low_risk_tickers":
         max_weight = {
             "classA": {
-                "sum": 0.50,
+                "sum": 0.45,
                 "assets": ["usdc", "usdt", "dai"],
             },
             "classB": {
@@ -97,7 +97,7 @@ def create_portfolios(
                 ],
             },
             "volatile": {
-                "sum": 0.05,
+                "sum": 0.10,
                 "assets": [
                     "btc",
                     "eth",

@@ -9,13 +9,15 @@ from ..data_collection.get_crypto_price_range import (
 from ..portfolio.Portfolio import Portfolio
 
 from typing import Dict, List
-from pandas.core.frame import DataFrame, Series
+from pandas.core.frame import DataFrame
+from pandas import Series
 from .delegate import BacktestingDelegate
 from datetime import datetime
 from pypfopt import expected_returns
 
 
 class PortfolioPerformance:
+
     def __init__(
         self,
         portfolio_name: str,
@@ -25,7 +27,7 @@ class PortfolioPerformance:
         portfolio_raw_composition: Series,
         portfolio_holdings: Series,
         portfolio_live_weights: Series,
-        portfolio_metrics: Series = None,
+        portfolio_metrics: Series | None = None,
     ):
         self.name = portfolio_name
         self.portfolio_value = portfolio_value
@@ -39,7 +41,7 @@ class PortfolioPerformance:
     def decompose_grouped_tokens(self, rosetta: pd.Series):
         decomposed = pd.DataFrame()
         for token in self.portfolio_holdings.index:
-            decomposed[token] = Portfolio.decompose_grouped_tokens(
+            decomposed[token] = Portfolio.decompose_grouped_tokens(  # type: ignore
                 self.portfolio_holdings[token], rosetta
             )
         return decomposed
@@ -112,7 +114,8 @@ class PortfolioPerformance:
 
         # Scale value & holdings
         self.portfolio_value *= scale_factor
-        self.portfolio_holdings *= scale_factor
+        self.portfolio_holdings *= scale_factor["Portfolio Value"]
+        # print(f"*Holdings* {self.portfolio_holdings}")
 
         print(f"New value: {self.portfolio_value.loc[date]}")
 
@@ -221,7 +224,9 @@ class Backtest:
                 self.portfolio_compositions[name].loc[date] = portfolio.weights
                 self.portfolio_raw_composition[name].loc[date] = portfolio.raw_weights
                 self.portfolio_metrics[name].loc[date] = portfolio.get_metrics()
-            self.portfolio_holdings[name].loc[date] = portfolio.holdings
+            self.portfolio_holdings[name].loc[date] = pd.Series(
+                portfolio.holdings, copy=False
+            )
             self.portfolio_live_weights[name].loc[date] = (
                 portfolio.holdings * prices / (portfolio.value(prices))
             )
@@ -476,6 +481,7 @@ class Backtest:
         performances: List[PortfolioPerformance],
         folder_path: str,
         file_name: str = "backtest_results.xlsx",
+        additional_data: Dict[str, pd.DataFrame] | None = None,
     ):
         """
         Export the results of the backtest to an Excel file.

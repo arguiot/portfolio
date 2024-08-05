@@ -45,8 +45,8 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
             alphas=alphas,
             target_weights=_new_target_weights,
             wealth_value=wealth_value,
-            projected_portfolio_value=base_value,
-            external_movement=0,
+            projected_portfolio_value=base_value,  # + external_movement if external_movement > 0 else base_value,
+            external_movement=0,  # $
         )
         trades = optimal_wealth_value / _prices
 
