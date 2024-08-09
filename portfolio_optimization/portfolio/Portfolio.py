@@ -78,7 +78,32 @@ class Portfolio:
             min_weight_dict["*"] = self.min_weight  # Using '*' for default value
             self.min_weight = min_weight_dict
 
-        self.latest_optimiser = self.optimiser(df, mcaps)
+        # Get the list of assets present in df
+        available_assets = set(df.columns)
+
+        print(f"Available assets: {available_assets}")
+
+        # Filter out assets with max weight specifically set to 0.0
+        assets_to_remove = {
+            k for k, v in self.max_weight.items() if v == 0.0 and k != "*"  # type: ignore
+        }
+
+        # Get the list of assets to keep
+        assets_to_keep = [
+            asset for asset in available_assets if asset not in assets_to_remove
+        ]
+
+        print(f"Assets to keep: {assets_to_keep}")
+
+        # Filter df to keep only the assets not specifically set to 0.0 max weight
+        filtered_df = df[assets_to_keep]
+
+        # Filter mcaps if it's not None
+        filtered_mcaps = None
+        if mcaps is not None:
+            filtered_mcaps = mcaps[assets_to_keep]
+
+        self.latest_optimiser = self.optimiser(filtered_df, filtered_mcaps)
         self.latest_optimiser.apply_kwargs(self.kwargs)
         setattr(self.latest_optimiser, "latest_apy", self.latest_apy)
 
@@ -120,6 +145,11 @@ class Portfolio:
         new_weights = self.latest_optimiser.get_weights()
         self.raw_weights = new_weights.copy()
 
+        # Add back removed assets with 0% weight
+        for asset in df.columns:
+            if asset not in new_weights.index:
+                new_weights[asset] = 0.0
+
         # Check and handle weights in case does not meet the 'max_weight'
         while new_weights.max() > self.max_weight["*"]:
             # Get the asset with maximum weight
@@ -146,13 +176,27 @@ class Portfolio:
                 new_weights[asset] = 1 - new_weights.sum()
                 break
 
+            # Filter df_rest and mcaps_rest
+            assets_to_keep_rest = [
+                asset for asset in set(df_rest.columns) if asset not in assets_to_remove
+            ]
+            df_rest_filtered = df_rest[assets_to_keep_rest]
+            mcaps_rest_filtered = None
+            if mcaps_rest is not None:
+                mcaps_rest_filtered = mcaps_rest[assets_to_keep_rest]
+
             # Re-run the optimiser on the rest of the assets
-            local_optimiser = self.optimiser(df_rest, mcaps_rest)
+            local_optimiser = self.optimiser(df_rest_filtered, mcaps_rest_filtered)
             local_optimiser.apply_kwargs(self.kwargs)
             setattr(local_optimiser, "latest_apy", self.latest_apy)
             new_weights_rest = local_optimiser.get_weights()
 
-            # Normalize the weight so that the sum of weights is 1. We look at the sum of `new_weights`, and we make sure that the sum of `new_weights_rest` is 1 - sum of `new_weights`
+            # Add back removed assets with 0% weight
+            for asset in df_rest.columns:
+                if asset not in new_weights_rest.index:
+                    new_weights_rest[asset] = 0.0
+
+            # Normalize the weight so that the sum of weights is 1
             new_weights_rest = new_weights_rest * (1 - new_weights.sum())
             # Combine original weights and the recalculated weights for the remaining assets
             new_weights = pd.concat([new_weights, new_weights_rest])
