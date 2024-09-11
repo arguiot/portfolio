@@ -8,7 +8,7 @@ from portfolio_optimization.optimization.GeneralOptimization import (
     GeneralOptimizationDelegate,
 )
 from portfolio_optimization.optimization.markowitz import Markowitz
-
+from portfolio_optimization.optimization.vault_allocation import VaultAllocation
 from portfolio_optimization.portfolio.delegate import PortfolioDelegate
 from portfolio_optimization.portfolio.rebalancing import optimal_wealth_trades
 from portfolio_optimization.backtesting.parity import (
@@ -130,3 +130,8 @@ class CustomParityDelegate(ParityProcessorDelegate):
         print(f"Max Return: {_return}")
         weights = parity_line.convertReturn(_return)[1:]
         return pd.Series(weights)
+
+
+class CustomVaultAllocationDelegate(GeneralOptimizationDelegate):
+    def setup(self, optimization_object: VaultAllocation):
+        return super().setup(optimization_object)

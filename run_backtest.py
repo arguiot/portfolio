@@ -29,10 +29,10 @@ scenarios = {
         "start_date": pd.to_datetime("2020-05-15"),
         "end_date": pd.to_datetime("2021-11-12"),
     },
-    # "bear_market": {
-    #     "start_date": pd.to_datetime("2021-11-12"),
-    #     "end_date": pd.to_datetime("2022-11-12"),
-    # },
+    "bear_market": {
+        "start_date": pd.to_datetime("2021-11-12"),
+        "end_date": pd.to_datetime("2022-11-12"),
+    },
     "sprint_bull_market": {
         "start_date": pd.to_datetime("2023-06-26"),
         "end_date": pd.to_datetime("2024-06-26"),
@@ -121,7 +121,12 @@ def run_for_asset_class(
         )
     )
 
-    backtest.export_results(_perfs, f"./out/{rebalance_frequency}/", filename)
+    backtest.export_results(
+        _perfs,
+        f"./out/{rebalance_frequency}/",
+        filename,
+        export_csv=("--csv" in sys.argv),
+    )
 
     return list(
         map(
@@ -234,6 +239,7 @@ if __name__ == "__main__":
                     performances=[parity_perf],
                     folder_path=f"./out/{rebalance_frequency}",
                     file_name=f"parity_{risk_mode.name}_{scenario}.xlsx",
+                    export_csv=("--csv" in sys.argv),
                 )
 
                 # Redo it with parity lookback period = None
@@ -260,6 +266,7 @@ if __name__ == "__main__":
                     performances=[parity_perf],
                     folder_path=f"./out/{rebalance_frequency}",
                     file_name=f"parity_{risk_mode.name}_{scenario}_no_parity_lookback.xlsx",
+                    export_csv=("--csv" in sys.argv),
                 )
 
     progress_logger.delete()

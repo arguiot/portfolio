@@ -107,6 +107,9 @@ class Portfolio:
         self.latest_optimiser.apply_kwargs(self.kwargs)
         setattr(self.latest_optimiser, "latest_apy", self.latest_apy)
 
+        if hasattr(self.latest_optimiser, "yield_data") and yield_data is not None:
+            self.latest_optimiser.yield_data = yield_data
+
         # If optimizer has `weight_bounds` attribute, provide max_weight and min_weight for each asset
         if hasattr(self.latest_optimiser, "weight_bounds"):
             if type(self.latest_optimiser.weight_bounds) != list:

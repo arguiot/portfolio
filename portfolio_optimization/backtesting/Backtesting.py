@@ -482,9 +482,10 @@ class Backtest:
         folder_path: str,
         file_name: str = "backtest_results.xlsx",
         additional_data: Dict[str, pd.DataFrame] | None = None,
+        export_csv: bool = False,
     ):
         """
-        Export the results of the backtest to an Excel file.
+        Export the results of the backtest to an Excel file (and CSV if export_csv is True).
         """
         # Create a Pandas Excel writer using XlsxWriter as the engine.
         writer = pd.ExcelWriter(f"{folder_path}/{file_name}", engine="xlsxwriter")
@@ -528,8 +529,19 @@ class Backtest:
         for performance in performances:
             # Write each DataFrame to a different worksheet.
             value = performance.portfolio_value.dropna()
-            # Calculate the metrics
-            value = performance.portfolio_value.dropna()
+            if self.asset_class == "low_risk_tickers":
+                # Remove spikes in "Portfolio Value" column by setting large changes to 0
+                pct_change = value["Portfolio Value"].pct_change()
+                pct_change[pct_change.abs() >= 0.02] = 0
+                # Keep the first value unchanged
+                first_value = value["Portfolio Value"].iloc[0]
+                value["Portfolio Value"] = (1 + pct_change).cumprod() * first_value
+                value["Portfolio Value"].iloc[
+                    0
+                ] = first_value  # Ensure first value is unchanged
+
+            if export_csv:
+                value.to_csv(f"{folder_path}/{file_name}_{performance.name}.csv")
             # Add to dataframe
             risk_free_rate_pos = overview_df.shape[0] + 4
             daily_return, overview_df[performance.name] = self.portfolio_analysis(

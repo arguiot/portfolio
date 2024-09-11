@@ -58,6 +58,11 @@ const runBacktestWithProgressBar = () => new Promise((resolve, reject) => {
   if (rebalancePeriod) {
     args.push('--rebalance', rebalancePeriod);
   }
+
+  // If `--csv` is specified, export CSV files instead of Excel
+  if (process.argv.includes('--csv')) {
+    args.push('--csv');
+  }
   const pythonProcess = spawn('python', args);
 
   pythonProcess.stdout.on('data', (data) => {

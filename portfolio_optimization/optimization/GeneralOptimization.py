@@ -77,7 +77,7 @@ class GeneralOptimization(ABC):
         """
         pass
 
-    def process_asset_weight_bounds(self):
+    def process_asset_weight_bounds(self, columns=None):
         assert hasattr(self, "asset_weight_bounds"), (
             "asset_weight_bounds attribute not found. "
             "Please make sure you have passed in the asset_weight_bounds argument "
@@ -90,7 +90,7 @@ class GeneralOptimization(ABC):
 
         # Now, let's expand the asset_weight_bounds dictionary to include all assets in the dataframe
         # First, let's get all the assets in the dataframe
-        assets = self.df.columns
+        assets = columns if columns is not None else self.df.columns
         # Now, let's expand the asset_weight_bounds dictionary to include all assets in the dataframe
         for asset in assets:
             if asset not in self.asset_weight_bounds:

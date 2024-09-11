@@ -12,16 +12,6 @@ def get_historical_prices_for_assets(
     start_date=pd.to_datetime("2021-06-26"),
     end_date=pd.to_datetime("2024-06-25"),
 ):
-    """
-    ...
-
-    Parameters:
-    ...
-    time_range (datetime.timedelta): Time range to retrieve prices for. By default, the last 90 days are used.
-
-    Returns:
-    pandas.DataFrame: A DataFrame containing the historical prices for the specified assets.
-    """
     df_dict = {}
 
     if assets_list is None:
@@ -34,12 +24,34 @@ def get_historical_prices_for_assets(
         ]
 
     for file in csv_files:
-        asset_name = os.path.basename(file).split(".")[
-            0
-        ]  # Extract asset name from file name
+        asset_name = os.path.basename(file).split(".")[0]
 
         try:
+            # Read the CSV file
             df = pd.read_csv(file)
+
+            # Check if 'time' column exists, if not, try to find a suitable date column
+            if "time" not in df.columns:
+                date_columns = [
+                    col
+                    for col in df.columns
+                    if "date" in col.lower() or "time" in col.lower()
+                ]
+                if date_columns:
+                    df["time"] = df[date_columns[0]]
+                else:
+                    print(
+                        f"Warning: No suitable date column found for {asset_name}. Skipping this asset."
+                    )
+                    continue
+
+            # Ensure 'time' column is present
+            if "time" not in df.columns:
+                print(
+                    f"Warning: 'time' column not found in {asset_name}. Skipping this asset."
+                )
+                continue
+
             # Filter out columns not in interested_columns. If column is not in df, make the value NaN. Keep 'time' column.
             df = df[
                 ["time"]
@@ -49,6 +61,7 @@ def get_historical_prices_for_assets(
                     if col in df.columns or col == "ReferenceRate"
                 ]
             ]
+
             # Create missing columns with NaN values
             for col in interested_columns:
                 if col not in df.columns and col != "ReferenceRate":
@@ -61,37 +74,27 @@ def get_historical_prices_for_assets(
             }
             df.rename(columns=rename_dict, inplace=True)
 
-        except ValueError as e:
-            # Missing column in csv, create df with zero
-            if "Usecols do not match columns" in str(e):
-                df = pd.read_csv(file, usecols=["time"])
+            # Convert 'time' to datetime and set as index
+            df["time"] = pd.to_datetime(df["time"])
+            df.rename(columns={"time": "date"}, inplace=True)
+            df.set_index("date", inplace=True)
 
-                # Add missing columns to dataframe with zero as values
-                for col in interested_columns:
-                    df[f"{asset_name}"] = 0
+            # Reindex df to fill missing dates
+            date_range = pd.date_range(start=start_date, end=end_date).drop_duplicates()
+            df = df[~df.index.duplicated(keep="first")]  # Remove duplicate labels
+            df = df.reindex(date_range, fill_value=np.nan)
 
-        # Rename 'time' column to 'date'
-        df["time"] = pd.to_datetime(df["time"])
-        df.rename(columns={"time": "date"}, inplace=True)
-        df.set_index("date", inplace=True)  # Set date as index
+            df_dict[asset_name] = df
 
-        # If time_range is not set, create one for 3 years
-        max_date = end_date
+        except Exception as e:
+            print(f"Error processing {asset_name}: {str(e)}")
+            continue
 
-        date_range = pd.date_range(start=start_date, end=max_date).drop_duplicates()
-
-        # Remove duplicate labels from the DataFrame's index
-        df = df[~df.index.duplicated(keep="first")]
-
-        # Reindex df to fill missing dates
-        df = df.reindex(date_range, fill_value=np.nan)
-
-        df_dict[asset_name] = df
-
-    # Join all dataframes on 'time' index
-    df_all = pd.concat(df_dict.values(), axis=1, join="inner")
-
-    # Replace infinite values with NaN
-    df_all.replace([np.inf, -np.inf], np.nan, inplace=True)
-
-    return df_all
+    # Join all dataframes on 'date' index
+    if df_dict:
+        df_all = pd.concat(df_dict.values(), axis=1, join="outer")
+        df_all.replace([np.inf, -np.inf], np.nan, inplace=True)
+        return df_all
+    else:
+        print("No valid data found for any asset.")
+        return None
