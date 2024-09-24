@@ -74,7 +74,7 @@ def create_portfolios(
         }
         # max_weight = {"*": 1.0}
     elif asset_class == "medium_risk_tickers":
-        max_weight = {"*": 0.03}
+        max_weight = {"*": 0.05}
         # max_weight = {"*": 1.0}
     elif asset_class == "low_risk_tickers":
         max_weight = {

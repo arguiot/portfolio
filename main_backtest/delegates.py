@@ -40,7 +40,7 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
 
         print("[WEALTH VALUE]: ", wealth_value)
 
-        optimal_wealth_value = optimal_wealth_trades(
+        (optimal_wealth_value,_,__) = optimal_wealth_trades(
             n_assets=len(_holdings),
             alphas=alphas,
             target_weights=_new_target_weights,

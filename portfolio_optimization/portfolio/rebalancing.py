@@ -36,18 +36,19 @@ def optimal_wealth_trades(
     external_movement,
 ):
 
-    tol = 1e-10
+    tol_weight = 1e-10
+    tol_cash = 1e-2
+
     epsilon = 1e-4
-    bar_alphas = alphas * (1 - epsilon)
+    bar_alphas = alphas*(1 - epsilon)
 
-    wealth_bar = target_weights * projected_portfolio_value - wealth_value
+    wealth_bar = target_weights*projected_portfolio_value - wealth_value
 
-    weights_max = (
-        target_weights * projected_portfolio_value * (1 + bar_alphas) - wealth_value
-    )
-    weights_min = (
-        target_weights * projected_portfolio_value * (1 - bar_alphas) - wealth_value
-    )
+    weights_max = target_weights*projected_portfolio_value*(1 + bar_alphas) - wealth_value
+    weights_min = target_weights*projected_portfolio_value*(1 - bar_alphas) - wealth_value
+
+    output_weights_max = target_weights*(1 + alphas)
+    output_weights_min = target_weights*(1 - alphas)
 
     removed_trades = np.zeros(n_assets, dtype=bool)
     output_wealth_value = np.copy(wealth_bar)
@@ -55,27 +56,28 @@ def optimal_wealth_trades(
     for i in range(n_assets):
 
         try:
-            optimal_wealth_value = optimal_wealth_trades_given_boundaries(
-                n_assets, weights_max, weights_min, wealth_bar, external_movement
-            )
+            optimal_wealth_value = optimal_wealth_trades_given_boundaries(n_assets, weights_max, weights_min,
+                                                                            wealth_bar, external_movement)
         except:
-            return output_wealth_value
+            return output_wealth_value, output_weights_min, output_weights_max
 
-        optimal_weights = (
-            wealth_value + optimal_wealth_value
-        ) / projected_portfolio_value
+        optimal_weights = (wealth_value + optimal_wealth_value)/projected_portfolio_value
 
-        abs_relative_deviation = np.divide(
-            np.abs(target_weights - optimal_weights),
-            target_weights,
-            out=np.float64(np.abs(optimal_weights) > tol),
-            where=(np.abs(target_weights) > tol),
-        )
+        abs_relative_deviation = np.divide(np.abs(target_weights - optimal_weights), target_weights,
+                                            out=np.float64(np.abs(optimal_weights) > tol_weight),
+                                            where=(np.abs(target_weights) > tol_weight))
 
         max_abs_relative_deviation = np.max(abs_relative_deviation - alphas)
+        error_max_abs_relative_deviation = max_abs_relative_deviation > tol_weight
 
-        if max_abs_relative_deviation >= 0:
-            return output_wealth_value
+        if(error_max_abs_relative_deviation):
+            return output_wealth_value, output_weights_min, output_weights_max
+
+        sum_abs_deviation_cash = np.abs(np.sum(optimal_wealth_value) - external_movement)
+        error_sum_abs_deviation_cash = sum_abs_deviation_cash > tol_cash
+
+        if(error_sum_abs_deviation_cash):
+            return output_wealth_value, output_weights_min, output_weights_max
 
         output_wealth_value = np.copy(optimal_wealth_value)
         optimal_wealth_value[removed_trades] = np.NaN
@@ -86,8 +88,21 @@ def optimal_wealth_trades(
         weights_max[j] = 0
         weights_min[j] = 0
 
-    return output_wealth_value
+    return output_wealth_value, output_weights_min, output_weights_max
 
+def optimal_wealth_trades_complete(n_assets, alphas, target_weights, wealth_value,
+                                   projected_portfolio_value, external_movement):
+
+    output_wealth_value, output_weights_min, output_weights_max = optimal_wealth_trades(n_assets, alphas, target_weights, wealth_value,
+                                                                                        projected_portfolio_value, external_movement)
+
+    output_weights = (wealth_value + output_wealth_value)/projected_portfolio_value
+
+    relative_deviation = np.divide(np.abs(target_weights - output_weights), target_weights,
+                               out=np.float64(np.abs(output_weights) > 1e-10),
+                               where=(np.abs(target_weights) > 1e-10))
+
+    return output_wealth_value, output_weights, output_weights_min, output_weights_max
 
 def optimize_trades(
     base_value: float,
