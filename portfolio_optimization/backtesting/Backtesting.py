@@ -110,14 +110,14 @@ class PortfolioPerformance:
         value_at_date = self.portfolio_value.loc[date]
         scale_factor = value / value_at_date
 
-        print(f"Scaling {self.name} by {scale_factor} at {date}")
+        # print(f"Scaling {self.name} by {scale_factor} at {date}")
 
         # Scale value & holdings
         self.portfolio_value *= scale_factor
         self.portfolio_holdings *= scale_factor["Portfolio Value"]
         # print(f"*Holdings* {self.portfolio_holdings}")
 
-        print(f"New value: {self.portfolio_value.loc[date]}")
+        # print(f"New value: {self.portfolio_value.loc[date]}")
 
         return self
 
@@ -143,7 +143,7 @@ class Backtest:
                 [
                     asset
                     for portfolio in portfolios.values()
-                    for asset in portfolios.assets()
+                    for asset in portfolio.assets
                 ],
                 folder_path,
             )
@@ -196,9 +196,21 @@ class Backtest:
     ):
         for date in total_dates:
             prices = self.price_data.loc[date]
-            self.portfolio_values[name].loc[date, "Portfolio Value"] = portfolio.value(
-                prices
-            )
+            portfolio_value = portfolio.value(prices)
+
+            # Remove spikes in portfolio value
+            if self.asset_class == "low_risk_tickers":
+                if date > total_dates[0]:
+                    prev_date = total_dates[total_dates.get_loc(date) - 1]
+                    prev_value = self.portfolio_values[name].loc[
+                        prev_date, "Portfolio Value"
+                    ]
+                    pct_change = (portfolio_value - prev_value) / prev_value
+                    if abs(pct_change) >= 0.02:
+                        portfolio_value = prev_value
+
+            self.portfolio_values[name].loc[date, "Portfolio Value"] = portfolio_value
+
             if self.adjust_holdings:
                 portfolio.match_weights(prices)
             if date in rebalance_dates:
@@ -346,10 +358,10 @@ class Backtest:
                 dataf = self.price_data.loc[:start]
                 current_prices = dataf.iloc[-1]
 
-                print(f"Rebalancing {name}")
-                print(f"Current Prices: {current_prices}")
-                print(f"Base Value: {portfolio.base_value}")
-                print(f"DataFrame: {dataf}")
+                # print(f"Rebalancing {name}")
+                # print(f"Current Prices: {current_prices}")
+                # print(f"Base Value: {portfolio.base_value}")
+                # print(f"DataFrame: {dataf}")
 
                 portfolio.rebalance(
                     df=dataf,
@@ -529,19 +541,27 @@ class Backtest:
         for performance in performances:
             # Write each DataFrame to a different worksheet.
             value = performance.portfolio_value.dropna()
-            if self.asset_class == "low_risk_tickers":
-                # Remove spikes in "Portfolio Value" column by setting large changes to 0
-                pct_change = value["Portfolio Value"].pct_change()
-                pct_change[pct_change.abs() >= 0.02] = 0
-                # Keep the first value unchanged
-                first_value = value["Portfolio Value"].iloc[0]
-                value["Portfolio Value"] = (1 + pct_change).cumprod() * first_value
-                value["Portfolio Value"].iloc[
-                    0
-                ] = first_value  # Ensure first value is unchanged
 
             if export_csv:
-                value.to_csv(f"{folder_path}/{file_name}_{performance.name}.csv")
+                # We create _value a copy of value to avoid modifying the original
+                _value = value.copy()
+                # We add at each day, the composition of the portfolio. One column per asset
+                for date, weights in performance.portfolio_compositions.items():
+                    if isinstance(weights, pd.Series):
+                        for asset in weights.index:
+                            # Create a new column for each asset if it doesn't exist
+                            if f"{asset}_weight" not in _value.columns:
+                                _value[f"{asset}_weight"] = pd.Series(dtype="float64")
+                            # Populate the column with weights on rebalance dates
+                            _value.at[date, f"{asset}_weight"] = weights[asset]
+
+                # Forward fill the missing values for all asset weight columns
+                weight_columns = [
+                    col for col in _value.columns if col.endswith("_weight")
+                ]
+                _value[weight_columns] = _value[weight_columns].ffill()
+
+                _value.to_csv(f"{folder_path}/{file_name}_{performance.name}.csv")
             # Add to dataframe
             risk_free_rate_pos = overview_df.shape[0] + 4
             daily_return, overview_df[performance.name] = self.portfolio_analysis(

@@ -38,9 +38,9 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
         # Wealth value is the value in $ for each asset. So it's the holdings multiplied by the price.
         wealth_value = _holdings * _prices
 
-        print("[WEALTH VALUE]: ", wealth_value)
+        # print("[WEALTH VALUE]: ", wealth_value)
 
-        (optimal_wealth_value,_,__) = optimal_wealth_trades(
+        (optimal_wealth_value, _, __) = optimal_wealth_trades(
             n_assets=len(_holdings),
             alphas=alphas,
             target_weights=_new_target_weights,
@@ -50,12 +50,12 @@ class OptRebalancingPortfolioDelegate(PortfolioDelegate):
         )
         trades = optimal_wealth_value / _prices
 
-        print("[OPTIMAL WEALTH VALUE]: ", optimal_wealth_value)
-        print("[TRADES]: ", trades)
+        # print("[OPTIMAL WEALTH VALUE]: ", optimal_wealth_value)
+        # print("[TRADES]: ", trades)
 
         new_holdings = holdings + trades
 
-        print("[NEW HOLDINGS]: ", new_holdings)
+        # print("[NEW HOLDINGS]: ", new_holdings)
 
         return new_holdings
 
@@ -127,7 +127,7 @@ class CustomMarkowitzDelegate(GeneralOptimizationDelegate):
 class CustomParityDelegate(ParityProcessorDelegate):
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
         _return = parity_line.getMaxReturn()
-        print(f"Max Return: {_return}")
+        # print(f"Max Return: {_return}")
         weights = parity_line.convertReturn(_return)[1:]
         return pd.Series(weights)
 

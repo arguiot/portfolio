@@ -53,7 +53,7 @@ class RiskParity(GeneralOptimization):
         return processed
 
     def process_constraints(self):
-        print("\nProcessing constraints:")
+        # print("\nProcessing constraints:")
         self.sector_constraints = {}
         self.asset_constraints = {}
         default_max = self.processed_max_weights.get("*", 1.0)
@@ -107,7 +107,7 @@ class RiskParity(GeneralOptimization):
                         1 / (self.df.shape[1] - 1),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
-                    print(f"Adjusted constraint for {asset}: (0, {adjusted_max})")
+                    # print(f"Adjusted constraint for {asset}: (0, {adjusted_max})")
 
         for sector, details in self.sector_constraints.items():
             sector_assets = details["assets"]
@@ -122,9 +122,9 @@ class RiskParity(GeneralOptimization):
                         1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
-                    print(
-                        f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
-                    )
+                    # print(
+                    #     f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
+                    # )
             else:
                 for asset in sector_assets:
                     original_max = self.max_weights.get(asset, default_max)
@@ -134,9 +134,9 @@ class RiskParity(GeneralOptimization):
                         1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
-                    print(
-                        f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
-                    )
+                    # print(
+                    #     f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
+                    # )
 
         for sector, details in self.sector_constraints.items():
             sector_assets = details["assets"]
@@ -149,17 +149,17 @@ class RiskParity(GeneralOptimization):
                     min_weight, max_weight = self.asset_constraints[asset]
                     adjusted_max = min(max_weight * adjustment_factor, 1.0)
                     self.asset_constraints[asset] = (min_weight, adjusted_max)
-                    print(
-                        f"Re-adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
-                    )
+                    # print(
+                    #     f"Re-adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
+                    # )
 
-        print("\nFinal constraints:")
-        for asset, (min_weight, max_weight) in self.asset_constraints.items():
-            print(f"  {asset}: ({min_weight}, {max_weight})")
-        for sector, details in self.sector_constraints.items():
-            print(
-                f"  Sector {sector}: allocation = {details['allocation']}, assets = {details['assets']}"
-            )
+        # print("\nFinal constraints:")
+        # for asset, (min_weight, max_weight) in self.asset_constraints.items():
+        #     print(f"  {asset}: ({min_weight}, {max_weight})")
+        # for sector, details in self.sector_constraints.items():
+        #     print(
+        #         f"  Sector {sector}: allocation = {details['allocation']}, assets = {details['assets']}"
+        #     )
 
     def optimize_sector_portfolio(self, sector_assets, sector_allocation):
         sector_df = self.df[sector_assets]
@@ -192,7 +192,7 @@ class RiskParity(GeneralOptimization):
 
         for solver in ["SCS", "ECOS_BB", "MOSEK", "CLARABEL"]:
             try:
-                prob.solve(solver=solver, verbose=True)
+                prob.solve(solver=solver, verbose=False)
                 if w.value is not None:
                     break
             except cp.error.SolverError:
@@ -243,7 +243,7 @@ class RiskParity(GeneralOptimization):
         if self.sector_constraints:
             sector_portfolios = {}
             for sector, details in self.sector_constraints.items():
-                print(f"\nProcessing sector: {sector}")
+                # print(f"\nProcessing sector: {sector}")
                 try:
                     sector_weights = self.optimize_sector_portfolio(
                         details["assets"], details["allocation"]
@@ -261,7 +261,7 @@ class RiskParity(GeneralOptimization):
                 print(f"Failed to optimize portfolio: {str(e)}")
                 return pd.Series()
 
-        print(f"Final weights: {final_weights}")
+        # print(f"Final weights: {final_weights}")
 
         return pd.Series(final_weights).sort_index()
 
@@ -298,15 +298,15 @@ class RiskParity(GeneralOptimization):
             if "usdc" in self.valid_assets:
                 usdc_index = list(self.valid_assets).index("usdc")
                 constraints[usdc_index] = w[usdc_index] <= 1.0 * k
-                print(f"Adjusting USDC max weight to: {remaining_weight}")
+                # print(f"Adjusting USDC max weight to: {remaining_weight}")
             elif "btc" in self.valid_assets:
                 btc_index = list(self.valid_assets).index("btc")
                 constraints[btc_index] = w[btc_index] <= 1.0 * k
-                print(f"Adjusting BTC max weight to: {remaining_weight}")
+                # print(f"Adjusting BTC max weight to: {remaining_weight}")
             elif "bnb" in self.valid_assets:
                 bnb_index = list(self.valid_assets).index("bnb")
                 constraints[bnb_index] = w[bnb_index] <= 1.0 * k
-                print(f"Adjusting BNB max weight to: {remaining_weight}")
+                # print(f"Adjusting BNB max weight to: {remaining_weight}")
 
         for key, value in self.processed_max_weights.items():
             if isinstance(value, dict) and "sum" in value:
@@ -318,7 +318,7 @@ class RiskParity(GeneralOptimization):
                 if class_indices:
                     class_selector = np.zeros((1, N))
                     class_selector[0, class_indices] = 1
-                    print(f"Adding class constraint for {key}: sum <= {value['sum']}")
+                    # print(f"Adding class constraint for {key}: sum <= {value['sum']}")
                     constraints.append(class_selector @ w <= value["sum"] * k)
 
         objective = cp.Minimize(risk * 1000)
@@ -326,15 +326,15 @@ class RiskParity(GeneralOptimization):
 
         for solver in ["SCS", "ECOS_BB", "MOSEK", "CLARABEL"]:
             try:
-                prob.solve(solver=solver, verbose=True)
+                prob.solve(solver=solver, verbose=False)
                 if w.value is not None:
                     break
             except cp.error.SolverError:
                 print(f"Solver {solver} failed. Trying next solver.")
 
         if w.value is None:
-            print("Optimization status:", prob.status)
-            print("Optimal value:", prob.value)
+            # print("Optimization status:", prob.status)
+            # print("Optimal value:", prob.value)
             for i, constraint in enumerate(constraints):
                 try:
                     print(f"Constraint {i} violation:", constraint.violation())
@@ -408,17 +408,18 @@ class RiskParity(GeneralOptimization):
         return cov
 
     def check_constraints(self, weights):
-        print("\nChecking constraints:")
-        for sector, details in self.sector_constraints.items():
-            sector_sum = sum(weights.get(asset, 0) for asset in details["assets"])
-            print(
-                f"Sector {sector}: sum of weights ({sector_sum:.4f}) == {details['allocation']}"
-            )
+        # print("\nChecking constraints:")
+        # for sector, details in self.sector_constraints.items():
+        #     sector_sum = sum(weights.get(asset, 0) for asset in details["assets"])
+        #     print(
+        #         f"Sector {sector}: sum of weights ({sector_sum:.4f}) == {details['allocation']}"
+        #     )
 
-        for asset, weight in weights.items():
-            constraint = self.asset_constraints.get(asset, (0, 1))
-            print(f"Asset {asset}: weight ({weight:.4f}) in range {constraint}")
+        # for asset, weight in weights.items():
+        #     constraint = self.asset_constraints.get(asset, (0, 1))
+        #     print(f"Asset {asset}: weight ({weight:.4f}) in range {constraint}")
 
-        print("\nFinal weights:")
-        for asset, weight in weights.items():
-            print(f"{asset}: {weight:.4f}")
+        # print("\nFinal weights:")
+        # for asset, weight in weights.items():
+        #     print(f"{asset}: {weight:.4f}")
+        return

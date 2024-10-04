@@ -17,26 +17,26 @@ np.random.seed(1)
 
 # Define scenarios
 scenarios = {
-    "stress_1": {
-        "start_date": pd.to_datetime("2020-06-26"),
-        "end_date": pd.to_datetime("2024-06-26"),
-    },
+    # "stress_1": {
+    #     "start_date": pd.to_datetime("2020-06-26"),
+    #     "end_date": pd.to_datetime("2024-06-26"),
+    # },
     "stress_2": {
         "start_date": pd.to_datetime("2021-06-26"),
         "end_date": pd.to_datetime("2024-06-26"),
     },
-    "bull_market": {
-        "start_date": pd.to_datetime("2020-05-15"),
-        "end_date": pd.to_datetime("2021-11-12"),
-    },
-    "bear_market": {
-        "start_date": pd.to_datetime("2021-11-12"),
-        "end_date": pd.to_datetime("2022-11-12"),
-    },
-    "sprint_bull_market": {
-        "start_date": pd.to_datetime("2023-06-26"),
-        "end_date": pd.to_datetime("2024-06-26"),
-    },
+    # "bull_market": {
+    #     "start_date": pd.to_datetime("2020-05-15"),
+    #     "end_date": pd.to_datetime("2021-11-12"),
+    # },
+    # "bear_market": {
+    #     "start_date": pd.to_datetime("2021-11-12"),
+    #     "end_date": pd.to_datetime("2022-11-12"),
+    # },
+    # "sprint_bull_market": {
+    #     "start_date": pd.to_datetime("2023-06-26"),
+    #     "end_date": pd.to_datetime("2024-06-26"),
+    # },
 }
 
 lookback_period = 120  # 120 days
@@ -54,6 +54,8 @@ def run_for_asset_class(
     progress_logger=None,
     scenario_tag=None,
     parity_lookback_period=parity_lookback_period,
+    asset_list: dict[str, list[str]] = {},
+    asset_class: str = "",
 ):
     yield_data = pd.Series()
     for asset in asset_list[asset_class]:
@@ -139,26 +141,25 @@ def run_for_asset_class(
     )
 
 
-if __name__ == "__main__":
+def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
     import warnings
+    from typing import List, Tuple
+    from portfolio_optimization.backtesting import PortfolioPerformance
 
     warnings.filterwarnings("ignore")
 
     progress_logger = ProgressLogger()
     asset_list = get_tickers()
 
-    if "--rebalance" in sys.argv:
-        rebalance_frequency = sys.argv[sys.argv.index("--rebalance") + 1]
-    else:
-        rebalance_frequency = "1M"
+    all_parity_perfs: List[PortfolioPerformance] = []
+    all_asset_class_results: List[List[PortfolioPerformance]] = []
 
     for scenario, dates in scenarios.items():
         print(f"Running scenario: {scenario}")
         start_date = dates["start_date"] - pd.Timedelta(days=parity_lookback_period)
         end_date = dates["end_date"]
 
-        if "--class" in sys.argv:
-            asset_class = sys.argv[sys.argv.index("--class") + 1]
+        if asset_class is not None:
             backtest = create_portfolios(
                 asset_list,
                 asset_class=asset_class,
@@ -170,13 +171,16 @@ if __name__ == "__main__":
                 daily_trade_generator=daily_trade_generator,
                 initial_cash=initial_cash,
             )
-            run_for_asset_class(
+            results = run_for_asset_class(
                 backtest=backtest,
                 rebalance_frequency=rebalance_frequency,
                 progress_logger=progress_logger,
                 scenario_tag=scenario,
                 parity_lookback_period=parity_lookback_period,
+                asset_list=asset_list,
+                asset_class=asset_class,
             )
+            all_asset_class_results.append(results)
         else:
             asset_classes = [
                 "high_risk_tickers",
@@ -212,7 +216,10 @@ if __name__ == "__main__":
                     progress_logger=logger,
                     scenario_tag=scenario,
                     parity_lookback_period=parity_lookback_period,
+                    asset_list=asset_list,
+                    asset_class=asset_class,
                 )
+                all_asset_class_results.append(results)
                 risk_parity = next(
                     result for result in results if result.name == "Risk Parity"
                 )
@@ -224,7 +231,7 @@ if __name__ == "__main__":
                 ParityProcessorDelegate.RiskMode.MEDIUM_RISK,
                 ParityProcessorDelegate.RiskMode.HIGH_RISK,
             ]:
-                print(f"Running risk parity for risk mode: {risk_mode.name}")
+                # print(f"Running risk parity for risk mode: {risk_mode.name}")
                 parity_processor = ParityBacktestingProcessor(
                     perfs[0],
                     perfs[1],
@@ -234,12 +241,13 @@ if __name__ == "__main__":
                 )
                 parity_processor.delegate = ParityProcessorDelegate(risk_mode)
                 parity_perf = parity_processor.backtest(initial_cash=initial_cash)
+                all_parity_perfs.append(parity_perf)
                 backtests[0].price_data = parity_processor.price_data()
                 backtests[0].export_results(
                     performances=[parity_perf],
                     folder_path=f"./out/{rebalance_frequency}",
                     file_name=f"parity_{risk_mode.name}_{scenario}.xlsx",
-                    export_csv=("--csv" in sys.argv),
+                    export_csv=csv_export,
                 )
 
                 # Redo it with parity lookback period = None
@@ -261,12 +269,31 @@ if __name__ == "__main__":
                 )
                 parity_processor.delegate = ParityProcessorDelegate(risk_mode)
                 parity_perf = parity_processor.backtest(initial_cash=initial_cash)
+                all_parity_perfs.append(parity_perf)
                 backtests[0].price_data = parity_processor.price_data()
                 backtests[0].export_results(
                     performances=[parity_perf],
                     folder_path=f"./out/{rebalance_frequency}",
                     file_name=f"parity_{risk_mode.name}_{scenario}_no_parity_lookback.xlsx",
-                    export_csv=("--csv" in sys.argv),
+                    export_csv=csv_export,
                 )
 
     progress_logger.delete()
+    return all_parity_perfs, all_asset_class_results
+
+
+if __name__ == "__main__":
+    rebalance_frequency = "1M"
+    asset_class = None
+    csv_export = False
+
+    if "--rebalance" in sys.argv:
+        rebalance_frequency = sys.argv[sys.argv.index("--rebalance") + 1]
+    if "--class" in sys.argv:
+        asset_class = sys.argv[sys.argv.index("--class") + 1]
+    if "--csv" in sys.argv:
+        csv_export = True
+
+    parity_performances, asset_class_results = main(
+        rebalance_frequency, asset_class, csv_export
+    )

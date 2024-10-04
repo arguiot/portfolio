@@ -62,8 +62,8 @@ class HRPOptimization(GeneralOptimization):
             return
         if self.rets is None or self.rets.shape[0] == 0:
             self.rets = expected_returns(self.df)
-            print(f"Rets: {self.rets}")
-            print(f"df: {self.df}")
+            # print(f"Rets: {self.rets}")
+            # print(f"df: {self.df}")
 
         self.process_asset_weight_bounds()
         min_vec = pd.Series(

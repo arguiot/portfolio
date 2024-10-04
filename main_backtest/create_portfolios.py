@@ -45,8 +45,8 @@ def create_portfolios(
         end_date=end_date,
     )
 
-    print(f"[START DATE]: {start_date}")
-    print(f"[DF Start Date]: {_df.index[0]}")
+    # print(f"[START DATE]: {start_date}")
+    # print(f"[DF Start Date]: {_df.index[0]}")
 
     # Filter out all columns containing `_` in their name
     df = _df.loc[:, ~_df.columns.str.contains("_")]
@@ -58,7 +58,7 @@ def create_portfolios(
 
     start_date_portfolio = start_date
 
-    print(f"[START DATE]: {start_date_portfolio}")
+    # print(f"[START DATE]: {start_date_portfolio}")
 
     # Specify per asset as well
     max_weight = {"*": 1.0}  # "*" key must be higher than the rest.
@@ -279,7 +279,7 @@ def create_portfolios(
 
     # portfolio_combination.delegate = chosen_delegate
 
-    print(f"[REBALANCE FREQUENCY]: {rebalance_frequency}")
+    # print(f"[REBALANCE FREQUENCY]: {rebalance_frequency}")
 
     portfolios = {
         "Markowitz": portfolio_markowitz,

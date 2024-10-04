@@ -44,7 +44,7 @@ class Markowitz(GeneralOptimization):
         self.asset_constraints = {}
 
     def process_constraints(self):
-        print("\nProcessing constraints:")
+        # print("\nProcessing constraints:")
         self.sector_constraints = {}
         self.asset_constraints = {}
         default_max = self.max_weights.get("*", 1.0)
@@ -100,7 +100,7 @@ class Markowitz(GeneralOptimization):
                         1 / (self.df.shape[1] - 1),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
-                    print(f"Adjusted constraint for {asset}: (0, {adjusted_max})")
+                    # print(f"Adjusted constraint for {asset}: (0, {adjusted_max})")
 
         # Adjust max weights within each sector if assets are missing
         for sector, details in self.sector_constraints.items():
@@ -116,9 +116,9 @@ class Markowitz(GeneralOptimization):
                         1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
-                    print(
-                        f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
-                    )
+                    # print(
+                    #     f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
+                    # )
             else:
                 for asset in sector_assets:
                     original_max = self.max_weights.get(asset, default_max)
@@ -128,9 +128,9 @@ class Markowitz(GeneralOptimization):
                         1 / (available_assets_count),
                     )
                     self.asset_constraints[asset] = (0, adjusted_max)
-                    print(
-                        f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
-                    )
+                    # print(
+                    #     f"Adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
+                    # )
 
         # Ensure the sum of max weights within each sector is feasible
         for sector, details in self.sector_constraints.items():
@@ -144,17 +144,17 @@ class Markowitz(GeneralOptimization):
                     min_weight, max_weight = self.asset_constraints[asset]
                     adjusted_max = min(max_weight * adjustment_factor, 1.0)
                     self.asset_constraints[asset] = (min_weight, adjusted_max)
-                    print(
-                        f"Re-adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
-                    )
+                    # print(
+                    #     f"Re-adjusted constraint for {asset} in {sector}: (0, {adjusted_max})"
+                    # )
 
-        print("\nFinal constraints:")
-        for asset, (min_weight, max_weight) in self.asset_constraints.items():
-            print(f"  {asset}: ({min_weight}, {max_weight})")
-        for sector, details in self.sector_constraints.items():
-            print(
-                f"  Sector {sector}: allocation = {details['allocation']}, assets = {details['assets']}"
-            )
+        # print("\nFinal constraints:")
+        # for asset, (min_weight, max_weight) in self.asset_constraints.items():
+        #     print(f"  {asset}: ({min_weight}, {max_weight})")
+        # for sector, details in self.sector_constraints.items():
+        #     print(
+        #         f"  Sector {sector}: allocation = {details['allocation']}, assets = {details['assets']}"
+        #     )
 
     def merge_sector_portfolios(self, sector_portfolios):
         final_weights = {}
@@ -194,9 +194,9 @@ class Markowitz(GeneralOptimization):
             scaled_max = max_weight
             weight_bounds.append((0, scaled_max))
 
-        print(f"Sector: {sector_assets}")
-        print(f"Sector: allocation = {sector_allocation}")
-        print(f"Weight bounds: {weight_bounds}")
+        # print(f"Sector: {sector_assets}")
+        # print(f"Sector: allocation = {sector_allocation}")
+        # print(f"Weight bounds: {weight_bounds}")
 
         ef = EfficientFrontier(
             sector_rets,
@@ -241,7 +241,7 @@ class Markowitz(GeneralOptimization):
             # Sector-based portfolio
             sector_portfolios = {}
             for sector, details in self.sector_constraints.items():
-                print(f"\nProcessing sector: {sector}")
+                # print(f"\nProcessing sector: {sector}")
                 try:
                     sector_weights = self.optimize_sector_portfolio(
                         details["assets"], details["allocation"]
@@ -276,20 +276,21 @@ class Markowitz(GeneralOptimization):
         return pd.Series(final_weights)
 
     def check_constraints(self, weights):
-        print("\nChecking constraints:")
-        for sector, details in self.sector_constraints.items():
-            sector_sum = sum(weights.get(asset, 0) for asset in details["assets"])
-            print(
-                f"Sector {sector}: sum of weights ({sector_sum:.4f}) == {details['allocation']}"
-            )
+        # print("\nChecking constraints:")
+        # for sector, details in self.sector_constraints.items():
+        #     sector_sum = sum(weights.get(asset, 0) for asset in details["assets"])
+        # print(
+        #     f"Sector {sector}: sum of weights ({sector_sum:.4f}) == {details['allocation']}"
+        # )
 
-        for asset, weight in weights.items():
-            constraint = self.asset_constraints.get(asset, (0, 1))
-            print(f"Asset {asset}: weight ({weight:.4f}) in range {constraint}")
+        # for asset, weight in weights.items():
+        #     constraint = self.asset_constraints.get(asset, (0, 1))
+        #     print(f"Asset {asset}: weight ({weight:.4f}) in range {constraint}")
 
-        print("\nFinal weights:")
-        for asset, weight in weights.items():
-            print(f"{asset}: {weight:.4f}")
+        # print("\nFinal weights:")
+        # for asset, weight in weights.items():
+        #     print(f"{asset}: {weight:.4f}")
+        return
 
     def get_metrics(self):
         if not hasattr(self, "weights") or self.weights is None:

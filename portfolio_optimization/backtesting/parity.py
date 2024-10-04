@@ -1,5 +1,6 @@
 from datetime import datetime
 from datetime import timedelta
+from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 from portfolio_optimization.backtesting import Backtest
@@ -148,12 +149,6 @@ class ParityProcessorDelegate:
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
         weights = parity_line._calculateWeights(self.risk)
         _return = parity_line.convertWeights(weights[0], weights[1], weights[2])
-        print(f"Weights: {weights}")
-        print(f"Return: {_return}")
-        # List all the attributes of the parity line
-        print("[PARITY LINE]")
-        for attr in dir(parity_line):
-            print(f"    {attr}: {getattr(parity_line, attr)}")
         return pd.Series(weights)
 
 
@@ -178,7 +173,12 @@ class ParityBacktestingProcessor:
 
         self.parity_lookback_period = parity_lookback_period
 
+        self.mode = mode
+
         self.delegate = ParityProcessorDelegate(mode)
+
+        # Initialize the high-risk parity portfolio for volatility calculation
+        self.high_risk_parity = pd.DataFrame(columns=["Portfolio Value"])
 
     def rebalance_line(self, up_to: datetime | None = None):
         assert self.portfolio_a is not None
@@ -216,9 +216,14 @@ class ParityBacktestingProcessor:
         )
 
         self.values.loc[start_date] = initial_cash
+        self.high_risk_parity.loc[start_date] = initial_cash
 
         current_date = start_date
         last_rebalance_date = None
+        last_rebalance_vol = 0.0
+
+        vol_history = pd.Series()
+
         while current_date <= end_date:
             prices = np.array(
                 [
@@ -227,28 +232,64 @@ class ParityBacktestingProcessor:
                     self.portfolio_g.portfolio_value.loc[current_date],
                 ]
             ).flatten()
+
             try:
-                if last_rebalance_date is None or (
-                    self.parity_lookback_period is not None
-                    and (current_date - last_rebalance_date).days
-                    >= self.parity_lookback_period
+                # Calculate simple volatility and smooth it over 7 days
+                if current_date >= start_date + timedelta(days=7):
+                    portfolio_returns = (
+                        self.high_risk_parity["Portfolio Value"].pct_change().dropna()
+                    )
+                    span = (
+                        self.parity_lookback_period
+                        if self.parity_lookback_period is not None
+                        else 90
+                    )
+                    rolling_volatility_delta = portfolio_returns.rolling(
+                        span
+                    ).std() * np.sqrt(365)
+                    smoothed_volatility_delta = (
+                        rolling_volatility_delta.rolling(window=1).mean().iloc[-1]
+                    )
+                else:
+                    smoothed_volatility_delta = 0
+            except Exception as e:
+                print(f"Error calculating volatility: {str(e)}")
+                traceback.print_exc()
+                print(f"Skipping volatility calculation for {current_date}")
+                smoothed_volatility_delta = 0
+
+            vol_history[current_date] = abs(
+                smoothed_volatility_delta - last_rebalance_vol
+            )
+
+            try:
+                if (
+                    last_rebalance_date is None
+                    or (
+                        self.parity_lookback_period is not None
+                        and (current_date - last_rebalance_date).days
+                        >= self.parity_lookback_period
+                    )
+                    or abs(smoothed_volatility_delta - last_rebalance_vol) > 0.15
                 ):
                     if self.parity_lookback_period is not None:
                         self.rebalance_line(current_date)
                     else:
                         self.rebalance_line(end_date)
                     last_rebalance_date = current_date
+                    last_rebalance_vol = smoothed_volatility_delta
 
                     # Convert the ParityLine to weights
                     weights = self.delegate.compute_weights(self.parity_line)
                     assert (
                         sum(weights) - 1 < 1e-5
                     ), f"Weights do not sum to 1: {sum(weights)}"
-                    print(f"Weights: {weights}")
                     self.weights.loc[current_date] = weights
 
+                    # Calculate weights for high-risk parity portfolio
+                    high_risk_weights = self.parity_line._calculateWeights(0.8)
+
                     # Convert the weights to holdings
-                    # Last value of the portfolio
                     last_value = (
                         self.values.iloc[-1]["Portfolio Value"]
                         if len(self.values) > 0
@@ -257,30 +298,22 @@ class ParityBacktestingProcessor:
                     if last_value == 0 or np.isnan(last_value):
                         last_value = initial_cash
 
-                    print(
-                        f"[Parity] Last value: {last_value}, last iloc: {self.values.iloc[-1]}",
-                        f"Current date: {current_date}, last iloc date: {self.values.iloc[-1].name}",
-                        "----------",  # Separator, because pandas makes it hard to read
-                    )
-
                     # Allocate the cash to each portfolio
-
                     self.holdings.loc[current_date] = (
                         last_value * np.array(weights.array) / prices
                     )
-                    # Update the portfolio value based on the current prices
-                    print(f"Date: {current_date}")
-                    print(
-                        f"Portfolio A: {self.portfolio_a.portfolio_value.loc[current_date]}"
+
+                    # Calculate holdings for high-risk parity portfolio
+                    high_risk_last_value = (
+                        self.high_risk_parity.iloc[-1]["Portfolio Value"]
+                        if len(self.high_risk_parity) > 0
+                        else initial_cash
                     )
-                    print(
-                        f"Portfolio B: {self.portfolio_b.portfolio_value.loc[current_date]}"
-                    )
-                    print(
-                        f"Portfolio G: {self.portfolio_g.portfolio_value.loc[current_date]}"
-                    )
-                    print(
-                        f"Prices: {prices}, Parity Holdings: {self.holdings.loc[current_date]}"
+                    if high_risk_last_value == 0 or np.isnan(high_risk_last_value):
+                        high_risk_last_value = initial_cash
+
+                    high_risk_holdings = (
+                        high_risk_last_value * np.array(high_risk_weights) / prices
                     )
 
             except AssertionError as e:
@@ -291,19 +324,31 @@ class ParityBacktestingProcessor:
 
             try:
                 _value = prices * self.holdings.iloc[-1]  # Last holdings
-                # If the date doesn't exist, this will create a new row
                 self.values.at[current_date, "Portfolio Value"] = _value.sum()
-                print(f"[Parity] Value updated at {current_date}: {_value.sum()}")
+
+                # Calculate value for high-risk parity portfolio
+                high_risk_value = prices * high_risk_holdings
+                self.high_risk_parity.at[current_date, "Portfolio Value"] = (
+                    high_risk_value.sum()
+                )
             except Exception as e:
                 import traceback
 
+                traceback.print_exc()
+                print(e)
+
             current_date += timedelta(days=1)
+
+        # Save a plot of the volatility history in the output folder
+        vol_history.plot(title="Volatility History")
+        plt.legend()  # Add a legend to the plot
+        plt.savefig(f"out/{self.mode}_volatility_history.png")
 
         # Export the holdings to a PortfolioPerformance object
         return PortfolioPerformance(
             portfolio_name="Parity",
             portfolio_value=self.values,
-            rebalance_dates=self.holdings.index,
+            rebalance_dates=pd.Series(self.holdings.index),
             portfolio_compositions=self.weights,
             portfolio_raw_composition=self.weights,
             portfolio_holdings=self.holdings,

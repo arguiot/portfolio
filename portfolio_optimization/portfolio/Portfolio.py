@@ -81,7 +81,7 @@ class Portfolio:
         # Get the list of assets present in df
         available_assets = set(df.columns)
 
-        print(f"Available assets: {available_assets}")
+        # print(f"Available assets: {available_assets}")
 
         # Filter out assets with max weight specifically set to 0.0
         assets_to_remove = {
@@ -93,7 +93,7 @@ class Portfolio:
             asset for asset in available_assets if asset not in assets_to_remove
         ]
 
-        print(f"Assets to keep: {assets_to_keep}")
+        # print(f"Assets to keep: {assets_to_keep}")
 
         # Filter df to keep only the assets not specifically set to 0.0 max weight
         filtered_df = df[assets_to_keep]

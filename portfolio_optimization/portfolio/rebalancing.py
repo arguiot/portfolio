@@ -17,6 +17,7 @@ def optimal_wealth_trades_given_boundaries(
     A = opt.matrix(1.0, (1, n_assets))
     b = opt.matrix(np.block([external_movement]), tc="d")
 
+    solvers.options["show_progress"] = False
     output = solvers.qp(P, q, G, h, A, b)["x"]
 
     return np.reshape(
@@ -40,15 +41,19 @@ def optimal_wealth_trades(
     tol_cash = 1e-2
 
     epsilon = 1e-4
-    bar_alphas = alphas*(1 - epsilon)
+    bar_alphas = alphas * (1 - epsilon)
 
-    wealth_bar = target_weights*projected_portfolio_value - wealth_value
+    wealth_bar = target_weights * projected_portfolio_value - wealth_value
 
-    weights_max = target_weights*projected_portfolio_value*(1 + bar_alphas) - wealth_value
-    weights_min = target_weights*projected_portfolio_value*(1 - bar_alphas) - wealth_value
+    weights_max = (
+        target_weights * projected_portfolio_value * (1 + bar_alphas) - wealth_value
+    )
+    weights_min = (
+        target_weights * projected_portfolio_value * (1 - bar_alphas) - wealth_value
+    )
 
-    output_weights_max = target_weights*(1 + alphas)
-    output_weights_min = target_weights*(1 - alphas)
+    output_weights_max = target_weights * (1 + alphas)
+    output_weights_min = target_weights * (1 - alphas)
 
     removed_trades = np.zeros(n_assets, dtype=bool)
     output_wealth_value = np.copy(wealth_bar)
@@ -56,27 +61,35 @@ def optimal_wealth_trades(
     for i in range(n_assets):
 
         try:
-            optimal_wealth_value = optimal_wealth_trades_given_boundaries(n_assets, weights_max, weights_min,
-                                                                            wealth_bar, external_movement)
+            optimal_wealth_value = optimal_wealth_trades_given_boundaries(
+                n_assets, weights_max, weights_min, wealth_bar, external_movement
+            )
         except:
             return output_wealth_value, output_weights_min, output_weights_max
 
-        optimal_weights = (wealth_value + optimal_wealth_value)/projected_portfolio_value
+        optimal_weights = (
+            wealth_value + optimal_wealth_value
+        ) / projected_portfolio_value
 
-        abs_relative_deviation = np.divide(np.abs(target_weights - optimal_weights), target_weights,
-                                            out=np.float64(np.abs(optimal_weights) > tol_weight),
-                                            where=(np.abs(target_weights) > tol_weight))
+        abs_relative_deviation = np.divide(
+            np.abs(target_weights - optimal_weights),
+            target_weights,
+            out=np.float64(np.abs(optimal_weights) > tol_weight),
+            where=(np.abs(target_weights) > tol_weight),
+        )
 
         max_abs_relative_deviation = np.max(abs_relative_deviation - alphas)
         error_max_abs_relative_deviation = max_abs_relative_deviation > tol_weight
 
-        if(error_max_abs_relative_deviation):
+        if error_max_abs_relative_deviation:
             return output_wealth_value, output_weights_min, output_weights_max
 
-        sum_abs_deviation_cash = np.abs(np.sum(optimal_wealth_value) - external_movement)
+        sum_abs_deviation_cash = np.abs(
+            np.sum(optimal_wealth_value) - external_movement
+        )
         error_sum_abs_deviation_cash = sum_abs_deviation_cash > tol_cash
 
-        if(error_sum_abs_deviation_cash):
+        if error_sum_abs_deviation_cash:
             return output_wealth_value, output_weights_min, output_weights_max
 
         output_wealth_value = np.copy(optimal_wealth_value)
@@ -90,19 +103,36 @@ def optimal_wealth_trades(
 
     return output_wealth_value, output_weights_min, output_weights_max
 
-def optimal_wealth_trades_complete(n_assets, alphas, target_weights, wealth_value,
-                                   projected_portfolio_value, external_movement):
 
-    output_wealth_value, output_weights_min, output_weights_max = optimal_wealth_trades(n_assets, alphas, target_weights, wealth_value,
-                                                                                        projected_portfolio_value, external_movement)
+def optimal_wealth_trades_complete(
+    n_assets,
+    alphas,
+    target_weights,
+    wealth_value,
+    projected_portfolio_value,
+    external_movement,
+):
 
-    output_weights = (wealth_value + output_wealth_value)/projected_portfolio_value
+    output_wealth_value, output_weights_min, output_weights_max = optimal_wealth_trades(
+        n_assets,
+        alphas,
+        target_weights,
+        wealth_value,
+        projected_portfolio_value,
+        external_movement,
+    )
 
-    relative_deviation = np.divide(np.abs(target_weights - output_weights), target_weights,
-                               out=np.float64(np.abs(output_weights) > 1e-10),
-                               where=(np.abs(target_weights) > 1e-10))
+    output_weights = (wealth_value + output_wealth_value) / projected_portfolio_value
+
+    relative_deviation = np.divide(
+        np.abs(target_weights - output_weights),
+        target_weights,
+        out=np.float64(np.abs(output_weights) > 1e-10),
+        where=(np.abs(target_weights) > 1e-10),
+    )
 
     return output_wealth_value, output_weights, output_weights_min, output_weights_max
+
 
 def optimize_trades(
     base_value: float,
@@ -156,7 +186,7 @@ def optimize_trades(
     solvers = [cp.ECOS, cp.SCS, cp.OSQP, cp.CVXOPT]
     for solver in solvers:
         try:
-            problem.solve(solver=solver, verbose=True)
+            problem.solve(solver=solver, verbose=False)
             if problem.status != cp.INFEASIBLE:
                 break
         except Exception as e:
@@ -348,11 +378,11 @@ def deterministic_optimal_rebalancing(
         not np.isclose(total_trade_value, external_movement, 1e-9)
         or is_overweight.any()
     ):
-        print(
-            f"The total trade value is not the same as the external movement. Total trade value: {total_trade_value}, external movement: {external_movement}. Trades: {trades * prices}"
-            if not np.isclose(total_trade_value, external_movement, 1e-9)
-            else f"The portfolio is overweight. Current weights: {current_weights}, max_W: {max_W}. Overweight assets: {is_overweight}"
-        )
+        # print(
+        #     f"The total trade value is not the same as the external movement. Total trade value: {total_trade_value}, external movement: {external_movement}. Trades: {trades * prices}"
+        #     if not np.isclose(total_trade_value, external_movement, 1e-9)
+        #     else f"The portfolio is overweight. Current weights: {current_weights}, max_W: {max_W}. Overweight assets: {is_overweight}"
+        # )
         # Then, we just rebalance to optimal weights, super straightforward
         new_holdings = (
             new_target_weights * (portfolio_value + external_movement) / prices
