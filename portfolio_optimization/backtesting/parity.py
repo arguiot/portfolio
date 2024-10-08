@@ -22,6 +22,8 @@ class ParityLine:
         self.r_a = 0.0
         self.r_b = 0.0
         self.r_c = 0.0
+        self.maxRisk = 0.8
+        self.minRisk = 0.0
 
     def regression(
         self,
@@ -31,15 +33,14 @@ class ParityLine:
     ):
         # Combine a and b
         # Compute weight A and B, using risk parity
-        rp = RiskParity(
-            df=pd.concat(
-                [
-                    portfolio_a.portfolio_value["Portfolio Value"],
-                    portfolio_b.portfolio_value["Portfolio Value"],
-                ],
-                axis=1,
-            )
+        combined_df = pd.concat(
+            [
+                portfolio_a.portfolio_value["Portfolio Value"].rename("A"),
+                portfolio_b.portfolio_value["Portfolio Value"].rename("B"),
+            ],
+            axis=1,
         )
+        rp = RiskParity(df=combined_df)
         _weights = rp.get_weights()
         self.weight_A = _weights.iloc[0]
         self.weight_B = _weights.iloc[1]
@@ -83,10 +84,10 @@ class ParityLine:
         ].pct_change().std() * np.sqrt(365)
 
     def getMinRisk(self):
-        return 0
+        return self.minRisk
 
     def getMaxRisk(self):
-        return 0.8
+        return self.maxRisk
 
     def convertReturn(self, _return):
         return_riskless = 0.1
@@ -139,16 +140,28 @@ class ParityProcessorDelegate:
         HIGH_RISK = 2
 
     def __init__(self, mode):
+        self.mode = mode
         if mode == self.RiskMode.LOW_RISK:
             self.risk = 0.15
         elif mode == self.RiskMode.MEDIUM_RISK:
-            self.risk = 0.40
+            self.risk = 0.20
         elif mode == self.RiskMode.HIGH_RISK:
-            self.risk = 0.60
+            self.risk = 0.45
 
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        # Assign floor and cap risk based on the risk mode
+        if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
+            parity_line.minRisk = 0.10  # 10%
+            parity_line.maxRisk = 0.30  # 30%
+        elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
+            parity_line.minRisk = 0.25  # 25%
+            parity_line.maxRisk = 0.80  # 80%
+        elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
+            parity_line.minRisk = 0.40  # 40%
+            parity_line.maxRisk = 1.00  # 100%
+
         weights = parity_line._calculateWeights(self.risk)
-        _return = parity_line.convertWeights(weights[0], weights[1], weights[2])
+        # _return = parity_line.convertWeights(weights[0], weights[1], weights[2])
         return pd.Series(weights)
 
 
@@ -287,7 +300,15 @@ class ParityBacktestingProcessor:
                     self.weights.loc[current_date] = weights
 
                     # Calculate weights for high-risk parity portfolio
+                    priorMinRisk = self.parity_line.minRisk
+                    priorMaxRisk = self.parity_line.maxRisk
+
+                    self.parity_line.minRisk = 0.4
+                    self.parity_line.maxRisk = 1.0
                     high_risk_weights = self.parity_line._calculateWeights(0.8)
+
+                    self.parity_line.minRisk = priorMinRisk
+                    self.parity_line.maxRisk = priorMaxRisk
 
                     # Convert the weights to holdings
                     last_value = (

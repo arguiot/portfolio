@@ -283,7 +283,7 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
 
 
 if __name__ == "__main__":
-    rebalance_frequency = "1M"
+    rebalance_frequency = "1W"
     asset_class = None
     csv_export = False
 
