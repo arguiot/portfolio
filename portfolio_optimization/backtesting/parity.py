@@ -144,7 +144,7 @@ class ParityProcessorDelegate:
         if mode == self.RiskMode.LOW_RISK:
             self.risk = 0.15
         elif mode == self.RiskMode.MEDIUM_RISK:
-            self.risk = 0.20
+            self.risk = 0.30
         elif mode == self.RiskMode.HIGH_RISK:
             self.risk = 0.45
 
@@ -154,7 +154,7 @@ class ParityProcessorDelegate:
             parity_line.minRisk = 0.10  # 10%
             parity_line.maxRisk = 0.30  # 30%
         elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
-            parity_line.minRisk = 0.25  # 25%
+            parity_line.minRisk = 0.20  # 25%
             parity_line.maxRisk = 0.80  # 80%
         elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
             parity_line.minRisk = 0.40  # 40%
