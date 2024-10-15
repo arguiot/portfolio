@@ -1,15 +1,21 @@
 import pandas as pd
+import numpy as np
 from portfolio_optimization.data_processing import *
 from portfolio_optimization.data_collection import *
 from tokens.get_assets import *
 import sys
+import os
 from portfolio_optimization.utils import ProgressLogger
 
-from portfolio_optimization.backtesting.Backtesting import Backtest
+from portfolio_optimization.backtesting.Backtesting import (
+    Backtest,
+    PortfolioPerformance,
+)
 from portfolio_optimization.backtesting.parity import (
     ParityLine,
     ParityBacktestingProcessor,
     ParityProcessorDelegate,
+    BTCParityProcessorDelegate,
 )
 from main_backtest.create_portfolios import create_portfolios
 
@@ -40,12 +46,37 @@ scenarios = {
 }
 
 lookback_period = 120  # 120 days
-
 parity_lookback_period = 90  # 90 days
-
 daily_trade_generator = False
-
 initial_cash = 10000.0
+
+
+def create_btc_portfolio_performance(start_date, end_date):
+    btc_data = get_historical_prices_for_assets(
+        ["btc"],
+        interested_columns=["ReferenceRate", "CapMrktEstUSD"],
+        start_date=start_date - pd.Timedelta(days=lookback_period),
+        end_date=end_date,
+    )
+
+    portfolio_value = pd.DataFrame({"Portfolio Value": btc_data["btc"]})
+    rebalance_dates = portfolio_value.index
+    portfolio_compositions = pd.Series(1, index=rebalance_dates, name="BTC")
+    portfolio_raw_composition = portfolio_compositions.copy()
+    portfolio_holdings = pd.Series(
+        1 / btc_data["btc"], index=rebalance_dates, name="BTC"
+    )
+    portfolio_live_weights = pd.Series(1, index=rebalance_dates, name="BTC")
+
+    return PortfolioPerformance(
+        portfolio_name="Bitcoin",
+        portfolio_value=portfolio_value,
+        rebalance_dates=rebalance_dates,
+        portfolio_compositions=portfolio_compositions,
+        portfolio_raw_composition=portfolio_raw_composition,
+        portfolio_holdings=portfolio_holdings,
+        portfolio_live_weights=portfolio_live_weights,
+    )
 
 
 def run_for_asset_class(
@@ -153,6 +184,7 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
 
     all_parity_perfs: List[PortfolioPerformance] = []
     all_asset_class_results: List[List[PortfolioPerformance]] = []
+    all_btc_parity_perfs: List[PortfolioPerformance] = []
 
     for scenario, dates in scenarios.items():
         print(f"Running scenario: {scenario}")
@@ -225,13 +257,16 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
                 )
                 perfs.append(risk_parity)
 
+            # Create Bitcoin portfolio performance
+            btc_perf = create_btc_portfolio_performance(start_date, end_date)
+
             # Run the risk parity backtest for each risk mode
             for risk_mode in [
                 ParityProcessorDelegate.RiskMode.LOW_RISK,
                 ParityProcessorDelegate.RiskMode.MEDIUM_RISK,
                 ParityProcessorDelegate.RiskMode.HIGH_RISK,
             ]:
-                # print(f"Running risk parity for risk mode: {risk_mode.name}")
+                # Regular parity backtest
                 parity_processor = ParityBacktestingProcessor(
                     perfs[0],
                     perfs[1],
@@ -250,7 +285,30 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
                     export_csv=csv_export,
                 )
 
-                # Redo it with parity lookback period = None
+                # Bitcoin parity backtest
+                btc_delegate = BTCParityProcessorDelegate(risk_mode)
+                btc_parity_processor = ParityBacktestingProcessor(
+                    btc_perf,
+                    None,
+                    perfs[2],
+                    parity_lookback_period=parity_lookback_period,
+                    delegate=btc_delegate,
+                    mode=risk_mode,
+                )
+                btc_parity_perf = btc_parity_processor.backtest(
+                    initial_cash=initial_cash
+                )
+                all_btc_parity_perfs.append(btc_parity_perf)
+                backtests[0].price_data = btc_parity_processor.price_data()
+                backtests[0].export_results(
+                    performances=[btc_parity_perf],
+                    folder_path=f"./out/{rebalance_frequency}",
+                    file_name=f"btc_parity_{risk_mode.name}_{scenario}.xlsx",
+                    export_csv=csv_export,
+                )
+
+                # Redo regular parity with parity lookback period = None
+                parity_delegate = ParityProcessorDelegate(risk_mode)
                 parity_processor = ParityBacktestingProcessor(
                     perfs[0].starting_from(
                         perfs[0].rebalance_dates[0]
@@ -265,9 +323,10 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
                         + pd.Timedelta(days=parity_lookback_period)
                     ),
                     parity_lookback_period=None,
+                    delegate=parity_delegate,
                     mode=risk_mode,
                 )
-                parity_processor.delegate = ParityProcessorDelegate(risk_mode)
+                parity_processor.delegate = parity_delegate
                 parity_perf = parity_processor.backtest(initial_cash=initial_cash)
                 all_parity_perfs.append(parity_perf)
                 backtests[0].price_data = parity_processor.price_data()
@@ -278,8 +337,37 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
                     export_csv=csv_export,
                 )
 
+                # Redo Bitcoin parity with parity lookback period = None
+                btc_delegate = BTCParityProcessorDelegate(risk_mode)
+                btc_parity_processor = ParityBacktestingProcessor(
+                    btc_perf.starting_from(
+                        btc_perf.rebalance_dates[0]
+                        + pd.Timedelta(days=parity_lookback_period)
+                    ),
+                    None,
+                    perfs[2].starting_from(
+                        perfs[2].rebalance_dates[0]
+                        + pd.Timedelta(days=parity_lookback_period)
+                    ),
+                    parity_lookback_period=None,
+                    delegate=btc_delegate,
+                    mode=risk_mode,
+                )
+                btc_parity_processor.delegate = btc_delegate
+                btc_parity_perf = btc_parity_processor.backtest(
+                    initial_cash=initial_cash
+                )
+                all_btc_parity_perfs.append(btc_parity_perf)
+                backtests[0].price_data = btc_parity_processor.price_data()
+                backtests[0].export_results(
+                    performances=[btc_parity_perf],
+                    folder_path=f"./out/{rebalance_frequency}",
+                    file_name=f"btc_parity_{risk_mode.name}_{scenario}_no_parity_lookback.xlsx",
+                    export_csv=csv_export,
+                )
+
     progress_logger.delete()
-    return all_parity_perfs, all_asset_class_results
+    return all_parity_perfs, all_asset_class_results, all_btc_parity_perfs
 
 
 if __name__ == "__main__":
@@ -294,6 +382,6 @@ if __name__ == "__main__":
     if "--csv" in sys.argv:
         csv_export = True
 
-    parity_performances, asset_class_results = main(
+    parity_performances, asset_class_results, btc_parity_performances = main(
         rebalance_frequency, asset_class, csv_export
     )
