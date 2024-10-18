@@ -26,22 +26,41 @@ class ParityLine:
         self.r_g = 0.0
         self.maxRisk = 0.8
         self.minRisk = 0.0
+        self.parity_lookback_period = 90
 
     def regression(
         self,
         portfolio_a: PortfolioPerformance,
         portfolio_b: PortfolioPerformance | None,
         portfolio_g: PortfolioPerformance,
+        override_sigma_g: float | None = None,
     ):
         if self.use_beta and portfolio_b is None:
             raise ValueError("Portfolio B is required when use_beta is True")
 
-        # Combine a and b if using Beta
+        # Utiliser les données tronquées pour RiskParity et les rendements
+        portfolio_a_truncated = portfolio_a.up_to(
+            look_back_period=self.parity_lookback_period
+        )
+        portfolio_g_truncated = portfolio_g.up_to(
+            look_back_period=self.parity_lookback_period
+        )
+        if self.use_beta:
+            portfolio_b_truncated = portfolio_b.up_to(
+                look_back_period=self.parity_lookback_period
+            )
+        else:
+            portfolio_b_truncated = None
+
         if self.use_beta:
             combined_df = pd.concat(
                 [
-                    portfolio_a.portfolio_value["Portfolio Value"].rename("A"),
-                    portfolio_b.portfolio_value["Portfolio Value"].rename("B"),
+                    portfolio_a_truncated.portfolio_value["Portfolio Value"].rename(
+                        "A"
+                    ),
+                    portfolio_b_truncated.portfolio_value["Portfolio Value"].rename(
+                        "B"
+                    ),
                 ],
                 axis=1,
             )
@@ -53,28 +72,48 @@ class ParityLine:
             self.weight_A = 1.0
             self.weight_B = 0.0
 
-        # Calculate returns and volatilities
-        self.r_a, self.sigma_a = self._calculate_return_and_volatility(portfolio_a)
+        # Calcul des rendements
+        self.r_a = self._calculate_return(portfolio_a_truncated)
         if self.use_beta:
-            self.r_b, self.sigma_b = self._calculate_return_and_volatility(portfolio_b)
-        self.r_g, self.sigma_g = self._calculate_return_and_volatility(portfolio_g)
+            self.r_b = self._calculate_return(portfolio_b_truncated)
+        self.r_g = self._calculate_return(portfolio_g_truncated)
 
-        # Calculate combined portfolio volatility
+        # Calcul des volatilités avec les données complètes jusqu'à 'up_to'
+        self.sigma_a = self._calculate_volatility(portfolio_a)
         if self.use_beta:
-            portfolio_ab = (
+            self.sigma_b = self._calculate_volatility(portfolio_b)
+        self.sigma_g = override_sigma_g or self._calculate_volatility(portfolio_g)
+
+        # Calcul de la volatilité combinée
+        if self.use_beta:
+            _portfolio_ab_series = (
                 portfolio_a.portfolio_value["Portfolio Value"] * self.weight_A
                 + portfolio_b.portfolio_value["Portfolio Value"] * self.weight_B
             )
-            self.sigma_ab = portfolio_ab.pct_change().std() * np.sqrt(365)
+            _portfolio_ab = pd.DataFrame(
+                {
+                    "Portfolio Value": _portfolio_ab_series,
+                }
+            )
+            portfolio_ab = PortfolioPerformance(
+                portfolio_name="Parity",
+                portfolio_value=_portfolio_ab,
+                rebalance_dates=pd.Series(_portfolio_ab_series.index),
+                portfolio_compositions=portfolio_a.portfolio_compositions,
+                portfolio_raw_composition=portfolio_a.portfolio_raw_composition,
+                portfolio_holdings=portfolio_a.portfolio_holdings,
+                portfolio_live_weights=portfolio_a.portfolio_live_weights,
+            )
+            self.sigma_ab = self._calculate_volatility(portfolio_ab)
         else:
             self.sigma_ab = self.sigma_a
 
-    def _calculate_return_and_volatility(self, portfolio):
+    def _calculate_return(self, portfolio):
         start_date = portfolio.portfolio_value["Portfolio Value"].index[0]
         end_date = portfolio.portfolio_value["Portfolio Value"].index[-1]
         years = (end_date - start_date).days / 365
 
-        # Calculate return (r) as before
+        # Calcul du rendement (r)
         r = (
             (
                 portfolio.portfolio_value["Portfolio Value"].iloc[-1]
@@ -82,13 +121,32 @@ class ParityLine:
             )
             ** (1 / years)
         ) - 1
+        return r
 
-        # Calculate smoothed volatility (sigma) over 7 days
-        pct_changes = portfolio.portfolio_value["Portfolio Value"].pct_change().dropna()
-        rolling_std = pct_changes.std()
-        rolling_volatility_delta = rolling_std * np.sqrt(365)
-        sigma = rolling_volatility_delta
-        return r, sigma
+    def _calculate_volatility(self, portfolio, up_to=None):
+        # Utiliser toutes les données jusqu'à 'up_to' pour calculer la volatilité
+        if up_to is not None:
+            data = portfolio.portfolio_value["Portfolio Value"].loc[:up_to]
+        else:
+            data = portfolio.portfolio_value["Portfolio Value"]
+
+        span = (
+            self.parity_lookback_period
+            if self.parity_lookback_period is not None
+            else 90
+        )
+        portfolio_returns = data.pct_change().dropna()
+
+        rolling_volatility_delta = portfolio_returns.rolling(span).std() * np.sqrt(365)
+        rolling_mean = rolling_volatility_delta.rolling(window=7).mean()
+        print(f"Rolling mean: {rolling_mean}")
+        sigma = rolling_mean.iloc[-1]
+
+        # If sigma is NaN, we compute regular volatility
+        if np.isnan(sigma):
+            sigma = portfolio_returns.std() * np.sqrt(365)
+
+        return sigma
 
     def getMinRisk(self):
         return self.minRisk
@@ -152,7 +210,8 @@ class ParityProcessorDelegate:
 
     def __init__(self, mode):
         self.mode = mode
-        self.threshold = 0.15
+        self.threshold = 0.10
+        self.override_sigma_g: float | None = None
         if mode == self.RiskMode.LOW_RISK:
             self.risk = 0.15
         elif mode == self.RiskMode.MEDIUM_RISK:
@@ -180,6 +239,7 @@ class BTCParityProcessorDelegate(ParityProcessorDelegate):
     def __init__(self, mode):
         super().__init__(mode)
         self.threshold = 0.10
+        self.override_sigma_g = 0.05
         # Override risk values for BTC
         if mode == self.RiskMode.LOW_RISK:
             self.risk = 0.15
@@ -242,16 +302,19 @@ class ParityBacktestingProcessor:
         if self.use_beta:
             assert self.portfolio_b is not None
 
+        # Obtenir les données tronquées pour RiskParity et les rendements
+        portfolio_a_truncated = self.portfolio_a.up_to(up_to)
+        portfolio_g_truncated = self.portfolio_g.up_to(up_to)
+        if self.use_beta:
+            portfolio_b_truncated = self.portfolio_b.up_to(up_to)
+        else:
+            portfolio_b_truncated = None
+
         self.parity_line.regression(
-            self.portfolio_a.up_to(up_to, look_back_period=self.parity_lookback_period),
-            (
-                self.portfolio_b.up_to(
-                    up_to, look_back_period=self.parity_lookback_period
-                )
-                if self.use_beta
-                else None
-            ),
-            self.portfolio_g.up_to(up_to, look_back_period=self.parity_lookback_period),
+            portfolio_a_truncated,
+            portfolio_b_truncated if self.use_beta else None,
+            portfolio_g_truncated,
+            override_sigma_g=self.delegate.override_sigma_g,
         )
 
     def backtest(self, initial_cash: float = 1000000.0):
@@ -359,7 +422,7 @@ class ParityBacktestingProcessor:
                     assert (
                         sum(weights) - 1 < 1e-5
                     ), f"Weights do not sum to 1: {sum(weights)}"
-                    self.weights.loc[current_date + timedelta(days=1)] = weights
+                    self.weights.loc[current_date] = weights
 
                     # Calculate weights for high-risk parity portfolio
                     priorMinRisk = self.parity_line.minRisk
