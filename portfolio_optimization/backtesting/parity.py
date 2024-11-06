@@ -210,8 +210,8 @@ class ParityProcessorDelegate:
 
     def __init__(self, mode):
         self.mode = mode
-        self.threshold = 0.10
-        self.override_sigma_g: float | None = None
+        self.threshold = 0.15
+        self.override_sigma_g: float | None = 0.05
         if mode == self.RiskMode.LOW_RISK:
             self.risk = 0.15
         elif mode == self.RiskMode.MEDIUM_RISK:
@@ -238,7 +238,7 @@ class ParityProcessorDelegate:
 class BTCParityProcessorDelegate(ParityProcessorDelegate):
     def __init__(self, mode):
         super().__init__(mode)
-        self.threshold = 0.10
+        self.threshold = 0.15
         self.override_sigma_g = 0.05
         # Override risk values for BTC
         if mode == self.RiskMode.LOW_RISK:
@@ -255,6 +255,93 @@ class BTCParityProcessorDelegate(ParityProcessorDelegate):
             parity_line.maxRisk = 0.30  # 30%
         elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
             parity_line.minRisk = 0.40  # 40%
+            parity_line.maxRisk = 1.0  # 100%
+        elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
+            parity_line.minRisk = 0.50  # 50%
+            parity_line.maxRisk = 1.00  # 100%
+
+        weights = parity_line._calculateWeights(self.risk)
+        return pd.Series(weights)
+
+
+class SOLParityProcessorDelegate(ParityProcessorDelegate):
+    def __init__(self, mode):
+        super().__init__(mode)
+        self.threshold = 0.15
+        self.override_sigma_g = 0.05
+        # Override risk values for SOL
+        if mode == self.RiskMode.LOW_RISK:
+            self.risk = 0.15
+        elif mode == self.RiskMode.MEDIUM_RISK:
+            self.risk = 0.55
+        elif mode == self.RiskMode.HIGH_RISK:
+            self.risk = 0.60
+
+    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        # Assign floor and cap risk based on the risk mode
+        if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
+            parity_line.minRisk = 0.10  # 10%
+            parity_line.maxRisk = 0.30  # 30%
+        elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
+            parity_line.minRisk = 0.50  # 40%
+            parity_line.maxRisk = 1.0  # 100%
+        elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
+            parity_line.minRisk = 0.50  # 50%
+            parity_line.maxRisk = 1.00  # 100%
+
+        weights = parity_line._calculateWeights(self.risk)
+        return pd.Series(weights)
+
+
+class MATICParityProcessorDelegate(ParityProcessorDelegate):
+    def __init__(self, mode):
+        super().__init__(mode)
+        self.threshold = 0.15
+        self.override_sigma_g = 0.05
+        # Override risk values for MATIC
+        if mode == self.RiskMode.LOW_RISK:
+            self.risk = 0.15
+        elif mode == self.RiskMode.MEDIUM_RISK:
+            self.risk = 0.50
+        elif mode == self.RiskMode.HIGH_RISK:
+            self.risk = 0.55
+
+    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        # Assign floor and cap risk based on the risk mode
+        if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
+            parity_line.minRisk = 0.10  # 10%
+            parity_line.maxRisk = 0.30  # 30%
+        elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
+            parity_line.minRisk = 0.50  # 40%
+            parity_line.maxRisk = 1.0  # 100%
+        elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
+            parity_line.minRisk = 0.50  # 50%
+            parity_line.maxRisk = 1.00  # 100%
+
+        weights = parity_line._calculateWeights(self.risk)
+        return pd.Series(weights)
+
+
+class BNBParityProcessorDelegate(ParityProcessorDelegate):
+    def __init__(self, mode):
+        super().__init__(mode)
+        self.threshold = 0.15
+        self.override_sigma_g = 0.05
+        # Override risk values for BNB
+        if mode == self.RiskMode.LOW_RISK:
+            self.risk = 0.15
+        elif mode == self.RiskMode.MEDIUM_RISK:
+            self.risk = 0.60
+        elif mode == self.RiskMode.HIGH_RISK:
+            self.risk = 0.45
+
+    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        # Assign floor and cap risk based on the risk mode
+        if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
+            parity_line.minRisk = 0.10  # 10%
+            parity_line.maxRisk = 0.30  # 30%
+        elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
+            parity_line.minRisk = 0.50  # 40%
             parity_line.maxRisk = 1.0  # 100%
         elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
             parity_line.minRisk = 0.50  # 50%
@@ -282,6 +369,7 @@ class ParityBacktestingProcessor:
         self.portfolio_g = portfolio_g
 
         self.weights = pd.Series(name="Weights")
+        self.live_weights = pd.Series(name="Live Weights")
         self.values = pd.DataFrame(columns=["Portfolio Value"])
         self.holdings = pd.Series(name="Holdings")
 
@@ -471,6 +559,10 @@ class ParityBacktestingProcessor:
             try:
                 _value = prices * self.holdings.iloc[-1]  # Last holdings
                 self.values.at[current_date, "Portfolio Value"] = _value.sum()
+                # Look at the holding & price to determine the live weights
+                self.live_weights.at[current_date] = pd.Series(
+                    (_value / self.values.at[current_date, "Portfolio Value"])
+                )
 
                 # Calculate value for high-risk parity portfolio
                 high_risk_value = prices * high_risk_holdings
@@ -501,7 +593,7 @@ class ParityBacktestingProcessor:
             portfolio_compositions=self.weights,
             portfolio_raw_composition=self.weights,
             portfolio_holdings=self.holdings,
-            portfolio_live_weights=self.weights,
+            portfolio_live_weights=self.live_weights,
         )
 
     def price_data(self):

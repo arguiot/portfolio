@@ -88,6 +88,10 @@ class VaultAllocation(GeneralOptimization):
         D: float,
     ):
         solvers.options["show_progress"] = False
+        if np.all(np.isclose(mu_tilde, mu_tilde[0])) and np.all(
+            np.isclose(EL_tilde, EL_tilde[0])
+        ):
+            return np.ones(n) / n
         # compute the optimal v from the target diversification factor D
         nu_opt = self.optimal_nu(
             D, n, weights_min, weights_max, mu_tilde, EL_tilde, omega

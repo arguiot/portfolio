@@ -555,11 +555,27 @@ class Backtest:
                             # Populate the column with weights on rebalance dates
                             _value.at[date, f"{asset}_weight"] = weights[asset]
 
+                for date, weights in performance.portfolio_live_weights.items():
+                    if isinstance(weights, pd.Series):
+                        for asset in weights.index:
+                            # Create a new column for each asset if it doesn't exist
+                            if f"{asset}_weight_live" not in _value.columns:
+                                _value[f"{asset}_weight_live"] = pd.Series(
+                                    dtype="float64"
+                                )
+                            # Populate the column with weights on rebalance dates
+                            _value.at[date, f"{asset}_weight_live"] = weights[asset]
+
                 # Forward fill the missing values for all asset weight columns
                 weight_columns = [
                     col for col in _value.columns if col.endswith("_weight")
                 ]
                 _value[weight_columns] = _value[weight_columns].ffill()
+
+                live_weights_columns = [
+                    col for col in _value.columns if col.endswith("_weight_live")
+                ]
+                _value[live_weights_columns] = _value[live_weights_columns].ffill()
 
                 _value.to_csv(f"{folder_path}/{file_name}_{performance.name}.csv")
             # Add to dataframe
