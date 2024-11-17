@@ -16,7 +16,6 @@ class ParityLine:
         self.use_beta = use_beta
         self.weight_A = 1.0 if not use_beta else 0.8
         self.weight_B = 0.0 if not use_beta else 0.2
-        self.weight_G = 0.0
         self.sigma_a = 0.0
         self.sigma_b = 0.0
         self.sigma_g = 0.0
@@ -271,7 +270,7 @@ class SOLParityProcessorDelegate(ParityProcessorDelegate):
         self.override_sigma_g = 0.05
         # Override risk values for SOL
         if mode == self.RiskMode.LOW_RISK:
-            self.risk = 0.15
+            self.risk = 0.60
         elif mode == self.RiskMode.MEDIUM_RISK:
             self.risk = 0.55
         elif mode == self.RiskMode.HIGH_RISK:
@@ -280,10 +279,10 @@ class SOLParityProcessorDelegate(ParityProcessorDelegate):
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
         # Assign floor and cap risk based on the risk mode
         if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
-            parity_line.minRisk = 0.10  # 10%
-            parity_line.maxRisk = 0.30  # 30%
+            parity_line.minRisk = 0.5  # 10%
+            parity_line.maxRisk = 1.0  # 30%
         elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
-            parity_line.minRisk = 0.50  # 40%
+            parity_line.minRisk = 0.50  # 50%
             parity_line.maxRisk = 1.0  # 100%
         elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
             parity_line.minRisk = 0.50  # 50%

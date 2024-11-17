@@ -31,7 +31,7 @@ class Portfolio:
         self.latest_apy: pd.Series | None = None
         self.base_value = base_value
         # Remove keys from mcaps that are not in initial_prices columns
-        if mcaps is not None:
+        if mcaps is not None and isinstance(mcaps, pd.DataFrame):
             mcaps = mcaps.reindex(initial_prices.columns)
         local_mcaps = mcaps
         if isinstance(mcaps, pd.DataFrame):
