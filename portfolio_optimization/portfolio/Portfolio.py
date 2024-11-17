@@ -33,7 +33,7 @@ class Portfolio:
         # Remove keys from mcaps that are not in initial_prices columns
         if mcaps is not None and isinstance(mcaps, pd.DataFrame):
             mcaps = mcaps.reindex(initial_prices.columns)
-        local_mcaps = mcaps
+        local_mcaps = mcaps if isinstance(mcaps, pd.Series) else None
         if isinstance(mcaps, pd.DataFrame):
             local_mcaps = mcaps.loc[0]
         self.rebalance(
