@@ -12,7 +12,7 @@ from enum import Enum
 
 
 class ParityLine:
-    def __init__(self, use_beta=True):
+    def __init__(self, use_beta=True, smoothing=7):
         self.use_beta = use_beta
         self.weight_A = 1.0 if not use_beta else 0.8
         self.weight_B = 0.0 if not use_beta else 0.2
@@ -26,6 +26,7 @@ class ParityLine:
         self.maxRisk = 0.8
         self.minRisk = 0.0
         self.parity_lookback_period = 90
+        self.smoothing = smoothing
 
     def regression(
         self,
@@ -137,7 +138,7 @@ class ParityLine:
         portfolio_returns = data.pct_change().dropna()
 
         rolling_volatility_delta = portfolio_returns.rolling(span).std() * np.sqrt(365)
-        rolling_mean = rolling_volatility_delta.rolling(window=7).mean()
+        rolling_mean = rolling_volatility_delta.rolling(window=self.smoothing).mean()
         print(f"Rolling mean: {rolling_mean}")
         sigma = rolling_mean.iloc[-1]
 
@@ -210,6 +211,7 @@ class ParityProcessorDelegate:
     def __init__(self, mode):
         self.mode = mode
         self.threshold = 0.15
+        self.smoothing = 7
         self.override_sigma_g: float | None = 0.05
         if mode == self.RiskMode.LOW_RISK:
             self.risk = 0.15
@@ -219,6 +221,7 @@ class ParityProcessorDelegate:
             self.risk = 0.45
 
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        parity_line.smoothing = self.smoothing
         # Assign floor and cap risk based on the risk mode
         if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
             parity_line.minRisk = 0.10  # 10%
@@ -248,6 +251,7 @@ class BTCParityProcessorDelegate(ParityProcessorDelegate):
             self.risk = 0.40
 
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        parity_line.smoothing = self.smoothing
         # Assign floor and cap risk based on the risk mode
         if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
             parity_line.minRisk = 0.10  # 10%
@@ -277,6 +281,7 @@ class SOLParityProcessorDelegate(ParityProcessorDelegate):
             self.risk = 0.60
 
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        parity_line.smoothing = self.smoothing
         # Assign floor and cap risk based on the risk mode
         if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
             parity_line.minRisk = 0.5  # 10%
@@ -306,6 +311,7 @@ class MATICParityProcessorDelegate(ParityProcessorDelegate):
             self.risk = 0.55
 
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        parity_line.smoothing = self.smoothing
         # Assign floor and cap risk based on the risk mode
         if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
             parity_line.minRisk = 0.10  # 10%
@@ -335,6 +341,7 @@ class BNBParityProcessorDelegate(ParityProcessorDelegate):
             self.risk = 0.45
 
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        parity_line.smoothing = self.smoothing
         # Assign floor and cap risk based on the risk mode
         if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
             parity_line.minRisk = 0.10  # 10%
@@ -360,8 +367,13 @@ class ParityBacktestingProcessor:
         delegate: ParityProcessorDelegate | None = None,
         mode: ParityProcessorDelegate.RiskMode = ParityProcessorDelegate.RiskMode.LOW_RISK,
     ):
+        self.delegate = (
+            delegate if delegate is not None else ParityProcessorDelegate(mode)
+        )
         self.use_beta = portfolio_b is not None
-        self.parity_line = ParityLine(use_beta=self.use_beta)
+        self.parity_line = ParityLine(
+            use_beta=self.use_beta, smoothing=self.delegate.smoothing
+        )
 
         self.portfolio_a = portfolio_a
         self.portfolio_b = portfolio_b
@@ -373,12 +385,9 @@ class ParityBacktestingProcessor:
         self.holdings = pd.Series(name="Holdings")
 
         self.parity_lookback_period = parity_lookback_period
+        self.volatility_period = parity_lookback_period
 
         self.mode = mode
-
-        self.delegate = (
-            delegate if delegate is not None else ParityProcessorDelegate(mode)
-        )
 
         # Initialize the high-risk parity portfolio for volatility calculation
         self.high_risk_parity = pd.DataFrame(columns=["Portfolio Value"])
@@ -396,6 +405,10 @@ class ParityBacktestingProcessor:
             portfolio_b_truncated = self.portfolio_b.up_to(up_to)
         else:
             portfolio_b_truncated = None
+
+        # Pass down props
+        self.parity_line.parity_lookback_period = self.parity_lookback_period
+        self.parity_line.smoothing = self.delegate.smoothing
 
         self.parity_line.regression(
             portfolio_a_truncated,
@@ -459,10 +472,10 @@ class ParityBacktestingProcessor:
 
             try:
                 # Calculate simple volatility and smooth it over 7 days
-                if current_date >= start_date + timedelta(days=7):
+                if current_date >= start_date + timedelta(days=self.delegate.smoothing):
                     span = (
-                        self.parity_lookback_period
-                        if self.parity_lookback_period is not None
+                        self.volatility_period
+                        if self.volatility_period is not None
                         else 90
                     )
                     portfolio_returns = (
@@ -472,7 +485,9 @@ class ParityBacktestingProcessor:
                     rolling_volatility_delta = portfolio_returns.rolling(
                         span
                     ).std() * np.sqrt(365)
-                    rolling_mean = rolling_volatility_delta.rolling(window=7).mean()
+                    rolling_mean = rolling_volatility_delta.rolling(
+                        window=self.delegate.smoothing
+                    ).mean()
                     print(f"Rolling mean: {rolling_mean}")
                     smoothed_volatility_delta = rolling_mean.iloc[-1]
                 else:
