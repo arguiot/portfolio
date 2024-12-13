@@ -45,14 +45,11 @@ def get_historical_prices_for_assets(
                     )
                     continue
 
-            # Ensure 'time' column is present
-            if "time" not in df.columns:
-                print(
-                    f"Warning: 'time' column not found in {asset_name}. Skipping this asset."
-                )
-                continue
+            # Fill NaN values in ReferenceRate with PriceUSD where available
+            if "ReferenceRate" in df.columns and "PriceUSD" in df.columns:
+                df["ReferenceRate"] = df["ReferenceRate"].fillna(df["PriceUSD"])
 
-            # Filter out columns not in interested_columns. If column is not in df, make the value NaN. Keep 'time' column.
+            # Filter out columns not in interested_columns
             df = df[
                 ["time"]
                 + [
