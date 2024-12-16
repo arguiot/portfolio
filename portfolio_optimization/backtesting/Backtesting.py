@@ -14,7 +14,7 @@ from pandas import Series
 from .delegate import BacktestingDelegate
 from datetime import datetime
 from pypfopt import expected_returns
-
+import os
 
 class PortfolioPerformance:
 
@@ -499,8 +499,9 @@ class Backtest:
         """
         Export the results of the backtest to an Excel file (and CSV if export_csv is True).
         """
+        file_path = os.path.join(folder_path, file_name)
         # Create a Pandas Excel writer using XlsxWriter as the engine.
-        writer = pd.ExcelWriter(f"{folder_path}/{file_name}", engine="xlsxwriter")
+        writer = pd.ExcelWriter(file_path, engine="xlsxwriter")
 
         # Copy price_data and crop it to the start and end dates of the backtest
         price_data = self.price_data.copy()
