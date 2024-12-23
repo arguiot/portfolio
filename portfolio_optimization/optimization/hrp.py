@@ -87,6 +87,8 @@ class HRPOptimization(GeneralOptimization):
         self.port.w_min = min_vec
         self.port.w_max = max_vec
 
+        print(self.df)
+
         self.weights = self.port.optimization(
             model="HRP",
             codependence="pearson",

@@ -32,7 +32,7 @@ scenarios = {
     # },
     "stress_2": {
         "start_date": pd.to_datetime("2021-06-26"),
-        "end_date": pd.to_datetime("2024-06-26"),
+        "end_date": pd.to_datetime("2024-06-26"),  # pd.to_datetime("2024-12-17"),
     },
     # "bull_market": {
     #     "start_date": pd.to_datetime("2020-05-15"),

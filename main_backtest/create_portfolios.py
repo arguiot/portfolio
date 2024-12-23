@@ -156,6 +156,9 @@ def create_portfolios(
     # OptRebalancingPortfolioDelegate()
     # )  # Or HeuristicRebalancingPortfolioDelegate()
 
+    print(f"Starting date: {start_date_portfolio}")
+    print(df.loc[:start_date_portfolio])
+
     porfolio_hrp = Portfolio(
         base_value=initial_bid,
         initial_prices=df.loc[:start_date_portfolio],
