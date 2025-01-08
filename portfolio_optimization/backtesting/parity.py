@@ -357,6 +357,36 @@ class BNBParityProcessorDelegate(ParityProcessorDelegate):
         return pd.Series(weights)
 
 
+class XRPParityProcessorDelegate(ParityProcessorDelegate):
+    def __init__(self, mode):
+        super().__init__(mode)
+        self.threshold = 0.15
+        self.override_sigma_g = 0.05
+        # Override risk values for XRP
+        if mode == self.RiskMode.LOW_RISK:
+            self.risk = 0.55
+        elif mode == self.RiskMode.MEDIUM_RISK:
+            self.risk = 0.60
+        elif mode == self.RiskMode.HIGH_RISK:
+            self.risk = 0.65
+
+    def compute_weights(self, parity_line: ParityLine) -> pd.Series:
+        parity_line.smoothing = self.smoothing
+        # Assign floor and cap risk based on the risk mode
+        if self.mode == self.RiskMode.LOW_RISK:  # LOW_RISK
+            parity_line.minRisk = 0.50  # 50%
+            parity_line.maxRisk = 1.00  # 100%
+        elif self.mode == self.RiskMode.MEDIUM_RISK:  # MEDIUM_RISK
+            parity_line.minRisk = 0.50  # 50%
+            parity_line.maxRisk = 1.00  # 100%
+        elif self.mode == self.RiskMode.HIGH_RISK:  # HIGH_RISK
+            parity_line.minRisk = 0.50  # 50%
+            parity_line.maxRisk = 1.00  # 100%
+
+        weights = parity_line._calculateWeights(self.risk)
+        return pd.Series(weights)
+
+
 class ParityBacktestingProcessor:
     def __init__(
         self,

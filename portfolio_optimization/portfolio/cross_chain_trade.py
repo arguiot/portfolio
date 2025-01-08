@@ -310,6 +310,10 @@ def optimal_wealth_trades_complete_given_bridge_tolerances(
         projected_portfolio_values
     )
 
+    # Transform NaN values to 0 in output_wealth_value. Output weight value is a multi dimensional array, so we need to iterate over each dimension
+    # for i in range(len(output_wealth_value.shape)):
+    #     output_wealth_value[np.isnan(output_wealth_value)] = 0
+
     output_bridges = np.sum(output_wealth_value, axis=1) - external_movements
 
     relative_deviation = np.divide(
@@ -330,15 +334,15 @@ def optimal_wealth_trades_complete_given_bridge_tolerances(
 
 
 def optimal_wealth_trades_complete(
-    n_assets,
-    n_networks,
-    alphas,
-    target_weights,
-    wealth_value,
-    chis,
-    projected_portfolio_values,
-    external_movements,
-    priority_queue,
+    n_assets: int,
+    n_networks: int,
+    alphas: np.ndarray,
+    target_weights: np.ndarray,
+    wealth_value: np.ndarray,
+    chis: np.ndarray,
+    projected_portfolio_values: np.ndarray,
+    external_movements: np.ndarray,
+    priority_queue: np.ndarray,
     beta_in=None,
     beta_out=None,
 ):

@@ -19,6 +19,7 @@ from portfolio_optimization.backtesting.parity import (
     SOLParityProcessorDelegate,
     MATICParityProcessorDelegate,
     BNBParityProcessorDelegate,
+    XRPParityProcessorDelegate,
 )
 from main_backtest.create_portfolios import create_portfolios
 
@@ -268,6 +269,7 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
             sol_perf = create_portfolio_performance("sol", start_date, end_date)
             matic_perf = create_portfolio_performance("matic", start_date, end_date)
             bnb_perf = create_portfolio_performance("bnb", start_date, end_date)
+            xrp_perf = create_portfolio_performance("xrp", start_date, end_date)
 
             # Run the risk parity backtest for each risk mode
             for risk_mode in [
@@ -412,34 +414,27 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
                     export_csv=csv_export,
                 )
 
-                # # Redo Bitcoin parity with parity lookback period = None
-                # btc_delegate = BTCParityProcessorDelegate(risk_mode)
-                # btc_parity_processor = ParityBacktestingProcessor(
-                #     btc_perf.starting_from(
-                #         btc_perf.rebalance_dates[0]
-                #         + pd.Timedelta(days=parity_lookback_period)
-                #     ),
-                #     None,
-                #     perfs[2].starting_from(
-                #         perfs[2].rebalance_dates[0]
-                #         + pd.Timedelta(days=parity_lookback_period)
-                #     ),
-                #     parity_lookback_period=None,
-                #     delegate=btc_delegate,
-                #     mode=risk_mode,
-                # )
-                # btc_parity_processor.delegate = btc_delegate
-                # btc_parity_perf = btc_parity_processor.backtest(
-                #     initial_cash=initial_cash
-                # )
-                # all_btc_parity_perfs.append(btc_parity_perf)
-                # backtests[0].price_data = btc_parity_processor.price_data()
-                # backtests[0].export_results(
-                #     performances=[btc_parity_perf],
-                #     folder_path=f"./out/{rebalance_frequency}",
-                #     file_name=f"btc_parity_{risk_mode.name}_{scenario}_no_parity_lookback.xlsx",
-                #     export_csv=csv_export,
-                # )
+                # Do XRP parity backtest
+                xrp_delegate = XRPParityProcessorDelegate(risk_mode)
+                xrp_parity_processor = ParityBacktestingProcessor(
+                    xrp_perf,
+                    None,
+                    perfs[2],
+                    parity_lookback_period=parity_lookback_period,
+                    delegate=xrp_delegate,
+                    mode=risk_mode,
+                )
+                xrp_parity_perf = xrp_parity_processor.backtest(
+                    initial_cash=initial_cash
+                )
+                all_parity_perfs.append(xrp_parity_perf)
+                backtests[0].price_data = xrp_parity_processor.price_data()
+                backtests[0].export_results(
+                    performances=[xrp_parity_perf],
+                    folder_path=f"./out/{rebalance_frequency}",
+                    file_name=f"xrp_parity_{risk_mode.name}_{scenario}.xlsx",
+                    export_csv=csv_export,
+                )
 
     progress_logger.delete()
     return all_parity_perfs, all_asset_class_results, all_btc_parity_perfs
