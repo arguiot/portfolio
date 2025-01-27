@@ -20,6 +20,8 @@ from portfolio_optimization.backtesting.parity import (
     MATICParityProcessorDelegate,
     BNBParityProcessorDelegate,
     XRPParityProcessorDelegate,
+    XLMParityProcessorDelegate,
+    SUIParityProcessorDelegate,
 )
 from main_backtest.create_portfolios import create_portfolios
 
@@ -270,6 +272,8 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
             matic_perf = create_portfolio_performance("matic", start_date, end_date)
             bnb_perf = create_portfolio_performance("bnb", start_date, end_date)
             xrp_perf = create_portfolio_performance("xrp", start_date, end_date)
+            xlm_perf = create_portfolio_performance("xlm", start_date, end_date)
+            sui_perf = create_portfolio_performance("sui", start_date, end_date)
 
             # Run the risk parity backtest for each risk mode
             for risk_mode in [
@@ -433,6 +437,50 @@ def main(rebalance_frequency="1M", asset_class=None, csv_export=False):
                     performances=[xrp_parity_perf],
                     folder_path=f"./out/{rebalance_frequency}",
                     file_name=f"xrp_parity_{risk_mode.name}_{scenario}.xlsx",
+                    export_csv=csv_export,
+                )
+
+                # Do XLM parity backtest
+                xlm_delegate = XLMParityProcessorDelegate(risk_mode)
+                xlm_parity_processor = ParityBacktestingProcessor(
+                    xlm_perf,
+                    None,
+                    perfs[2],
+                    parity_lookback_period=parity_lookback_period,
+                    delegate=xlm_delegate,
+                    mode=risk_mode,
+                )
+                xlm_parity_perf = xlm_parity_processor.backtest(
+                    initial_cash=initial_cash
+                )
+                all_parity_perfs.append(xlm_parity_perf)
+                backtests[0].price_data = xlm_parity_processor.price_data()
+                backtests[0].export_results(
+                    performances=[xlm_parity_perf],
+                    folder_path=f"./out/{rebalance_frequency}",
+                    file_name=f"xlm_parity_{risk_mode.name}_{scenario}.xlsx",
+                    export_csv=csv_export,
+                )
+
+                # Do SUI parity backtest
+                sui_delegate = SUIParityProcessorDelegate(risk_mode)
+                sui_parity_processor = ParityBacktestingProcessor(
+                    sui_perf,
+                    None,
+                    perfs[2],
+                    parity_lookback_period=parity_lookback_period,
+                    delegate=sui_delegate,
+                    mode=risk_mode,
+                )
+                sui_parity_perf = sui_parity_processor.backtest(
+                    initial_cash=initial_cash
+                )
+                all_parity_perfs.append(sui_parity_perf)
+                backtests[0].price_data = sui_parity_processor.price_data()
+                backtests[0].export_results(
+                    performances=[sui_parity_perf],
+                    folder_path=f"./out/{rebalance_frequency}",
+                    file_name=f"sui_parity_{risk_mode.name}_{scenario}.xlsx",
                     export_csv=csv_export,
                 )
 
