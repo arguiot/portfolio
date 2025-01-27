@@ -360,15 +360,15 @@ class BNBParityProcessorDelegate(ParityProcessorDelegate):
 class XRPParityProcessorDelegate(ParityProcessorDelegate):
     def __init__(self, mode):
         super().__init__(mode)
-        self.threshold = 0.15
+        self.threshold = 0.20
         self.override_sigma_g = 0.05
         # Override risk values for XRP
         if mode == self.RiskMode.LOW_RISK:
-            self.risk = 0.55
+            self.risk = 0.45
         elif mode == self.RiskMode.MEDIUM_RISK:
-            self.risk = 0.60
+            self.risk = 0.50
         elif mode == self.RiskMode.HIGH_RISK:
-            self.risk = 0.65
+            self.risk = 0.55
 
     def compute_weights(self, parity_line: ParityLine) -> pd.Series:
         parity_line.smoothing = self.smoothing

@@ -158,7 +158,7 @@ def main():
     symbol_to_id = build_symbol_mapping(max_pages=10)
 
     # Read all tickers from the three risk files
-    risk_files = ["arthur.txt"]  # ["high_risk.txt", "medium_risk.txt", "low_risk.txt"]
+    risk_files = ["high_risk.txt", "medium_risk.txt", "low_risk.txt", "arthur.txt"]
     tickers = set()  # use a set to avoid duplicates
     for filename in risk_files:
         if os.path.exists(filename):

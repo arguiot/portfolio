@@ -72,6 +72,7 @@ def optimal_wealth_trades_given_network(
     projected_portfolio_values,
     external_movements,
     current_network,
+    current_category,
 ):
 
     tol_weight = 1e-10
@@ -122,8 +123,17 @@ def optimal_wealth_trades_given_network(
     mask_network[current_network] = True
     mask_network_flatten = mask_network.flatten()
 
+    mask_category = np.zeros((n_networks, n_assets), dtype=bool)
+    mask_category_assets = n_networks - np.sum(chis, axis=0) == current_category
+    mask_category[..., mask_category_assets] = True
+    mask_category_flatten = mask_category.flatten()
+
     current_chis_flatten_try = current_chis_flatten.copy()
-    n_available_assets = np.int64(chis.sum(axis=1)[current_network])
+
+    chis_given_category = np.copy(chis)
+    chis_given_category[np.invert(mask_category)] = 0
+
+    n_available_assets = np.int64(chis_given_category.sum(axis=1)[current_network])
 
     for i in range(n_available_assets + 1):
 
@@ -202,6 +212,9 @@ def optimal_wealth_trades_given_network(
             optimal_wealth_value_flatten[
                 np.array(1 - mask_network_flatten, dtype=bool)
             ] = np.NaN
+            optimal_wealth_value_flatten[
+                np.array(1 - mask_category_flatten, dtype=bool)
+            ] = np.NaN
 
             index = np.nanargmin(np.abs(optimal_wealth_value_flatten))
             current_chis_flatten_try[index] = 0
@@ -252,26 +265,34 @@ def optimal_wealth_trades(
     output_wealth_value = np.copy(wealth_bar)
     current_chis_flatten = chis.flatten()
 
+    categories = np.sort(np.unique(n_networks - np.sum(chis, axis=0)))
+    n_categories = len(categories)
+
     for j in range(n_networks):
 
         current_network = np.flip(priority_queue)[j]
 
-        status, output_wealth_value, current_chis_flatten = (
-            optimal_wealth_trades_given_network(
-                n_assets,
-                n_networks,
-                alphas,
-                target_weights,
-                wealth_value,
-                chis,
-                np.reshape(current_chis_flatten, [n_networks, n_assets]),
-                beta_out,
-                beta_in,
-                projected_portfolio_values,
-                external_movements,
-                current_network,
+        for k in range(n_categories):
+
+            current_category = categories[k]
+
+            status, output_wealth_value, current_chis_flatten = (
+                optimal_wealth_trades_given_network(
+                    n_assets,
+                    n_networks,
+                    alphas,
+                    target_weights,
+                    wealth_value,
+                    chis,
+                    np.reshape(current_chis_flatten, [n_networks, n_assets]),
+                    beta_out,
+                    beta_in,
+                    projected_portfolio_values,
+                    external_movements,
+                    current_network,
+                    current_category,
+                )
             )
-        )
 
     return status, output_wealth_value, output_weights_min, output_weights_max
 
@@ -310,10 +331,6 @@ def optimal_wealth_trades_complete_given_bridge_tolerances(
         projected_portfolio_values
     )
 
-    # Transform NaN values to 0 in output_wealth_value. Output weight value is a multi dimensional array, so we need to iterate over each dimension
-    # for i in range(len(output_wealth_value.shape)):
-    #     output_wealth_value[np.isnan(output_wealth_value)] = 0
-
     output_bridges = np.sum(output_wealth_value, axis=1) - external_movements
 
     relative_deviation = np.divide(
@@ -343,13 +360,11 @@ def optimal_wealth_trades_complete(
     projected_portfolio_values: np.ndarray,
     external_movements: np.ndarray,
     priority_queue: np.ndarray,
-    beta_in=None,
-    beta_out=None,
 ):
-    if beta_in is None:
-        beta_in = np.zeros(n_networks)
-    if beta_out is None:
-        beta_out = np.zeros(n_networks)
+
+    beta_in = np.zeros(n_networks)
+    beta_out = np.zeros(n_networks)
+
     (
         status,
         output_wealth_value,
